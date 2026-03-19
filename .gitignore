@@ -1,4 +1,9 @@
 myvenv/
 .DS_Store
 .env
-.log
+*.log
+*_test*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc

@@ -1,3 +1,4 @@
 fyers-apiv3
 python-dotenv
-.log
+websockets
+uvicorn

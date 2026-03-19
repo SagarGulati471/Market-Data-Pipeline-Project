@@ -7,7 +7,7 @@ def setup_logger():
     logging.basicConfig(
         level=getattr(logging, log_level),
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        force=True
+        force=True # Force the logging configuration to be applied even if handlers are already present. This ensures that our logging configuration takes precedence and is applied regardless of any previous configurations made by other libraries.
     )
 
 

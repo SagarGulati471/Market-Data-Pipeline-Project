@@ -21,6 +21,8 @@ class Config:
         self.ACCESS_TOKEN = os.getenv("FYERS_ACCESS_TOKEN")
         self.REFRESH_TOKEN = os.getenv("FYERS_REFRESH_TOKEN")
         self.REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI")
+        self.WEBSOCKET_URL = os.getenv('WEBSOCKET_URL', 'wss://rtsocket-api.fyers.in/versova').strip("'")
+        self.SYMBOL_TICKERS = os.getenv('SYMBOL_TICKERS', 'NSE:SBIN- EQ').strip("'").split(',')
 
         return self
 
