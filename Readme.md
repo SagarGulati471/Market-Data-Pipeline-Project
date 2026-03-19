@@ -6,6 +6,9 @@ The project aims for the real time stock market data collection, cleaning it, pr
 ### Architecture Design
 Link - https://app.diagrams.net/#G1XzVCH1INkYbS2aGT_wJ4cgXVnr5ShD6k#%7B%22pageId%22%3A%22-xqMkZ9DFNTepwFP1atR%22%7D
 
+<img width="815" height="793" alt="image" src="https://github.com/user-attachments/assets/87cb23d4-630b-47b6-aa6d-37e675a0351b" />
+
+
 
 ## Env variables to be set
 * FYERS_CLIENT_ID
