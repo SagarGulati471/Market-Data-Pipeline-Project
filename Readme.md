@@ -8,13 +8,13 @@ Link - https://app.diagrams.net/#G1XzVCH1INkYbS2aGT_wJ4cgXVnr5ShD6k#%7B%22pageId
 
 
 ## Env variables to be set
-FYERS_CLIENT_ID
-FYERS_SECRET_KEY
-FYERS_USER_PIN
-FYERS_REDIRECT_URI
-FYERS_ACCESS_TOKEN
-FYERS_REFRESH_TOKEN
-LOG_LEVEL=DEBUG
+* FYERS_CLIENT_ID
+* FYERS_SECRET_KEY
+* FYERS_USER_PIN
+* FYERS_REDIRECT_URI
+* FYERS_ACCESS_TOKEN
+* FYERS_REFRESH_TOKEN
+* LOG_LEVEL=DEBUG
 
 ## Procedure to gain API authentication
 
@@ -38,5 +38,37 @@ Generate the authentication token
 Pass the authentication token to the APIs
 
 
+# About Protobuf format
+
+
+### Steps to setup Protobuf
+
+For Windows - 
+* 1.) Download the the archive according to your OS
+* 2.) Once downloaded, extract it and place it to the correct path, like under C:// directory
+* 3.) Add the path to the bin directory in the systems variables
+
+*Link tot the archives* - https://github.com/protocolbuffers/protobuf/releases  
+*Youtube Link* - https://www.youtube.com/watch?v=94P_0-xlZIs
+
+
+**To create the protobuf files according to your programming language**
+
+* 1.) Create a <filename>.proto file and add the schema in that, usually the organizations provide this schema info with their API documentation
+* 2.) Once schemas are ready in the .proto file, then add run the command - "protoc --python_out=. <filename>.proto"
+* 3.) This will create a file <filename>_pb2.py (.py for python)
+* 4.) Now we can import this file in our code and extract the binary being received by the websocket according to the datatytpes
+
+
+
+# How to execute the data collection
+* go to the parent project folder - Market_Data_Pipeline_Project/Data_collector
+* run - python -m data_collector.websocket
+
+
+
+
 ### Contributor
 Sagar Gulati
+
+

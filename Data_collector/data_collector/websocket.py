@@ -33,21 +33,44 @@ def get_auth_info():
 
 async def subscribe_to_data(websocket, symbol_tickers):
     
-    subscribe_msg = {
-                        "type": 1,
-                        "data": {
-                            "subs": 1,
-                            "symbols": list(symbol_tickers),
-                            "mode": "depth",
-                            "channel": "1",
-                        },
-                    }
-
+    if not websocket:
+        logger.error("WebSocket connection is not established. Cannot subscribe to data.")
+        return
+    
     logger.info(f"Sbscribing to symbols: {symbol_tickers}")
     try:
+        subscribe_msg = {
+                            "type": 1,
+                            "data": {
+                                "subs": 1,
+                                "symbols": list(symbol_tickers),
+                                "mode": "depth",
+                                "channel": "1",
+                            },
+                        }
+
         await websocket.send(json.dumps(subscribe_msg))
+        logger.info(f"Subscription message sent: {subscribe_msg}")
+
+        # Resume the channel(s)
+        resume_msg = {
+            "type": 2,
+            "data": {
+                "resumeChannels": ["1"],   # list of strings
+                "pauseChannels": []        # optional
+            }
+        }
+
+        await websocket.send(json.dumps(resume_msg))
+        logger.info(f"Resume message sent: {resume_msg}")
+
     except Exception as e:
-        logger.error(f"Exception occured while subcribing to symbols: {e}")
+        logger.error(f"Error occured while subcribing to symbols: {e}")
+
+
+
+
+
 
 
 async def push_to_kafka(data):
@@ -63,14 +86,21 @@ async def data_receiver(websocket):
         try:
             message = await websocket.recv()
             logger.debug("Received message: %s", message)
-            # Here we can add code to push the received data to Kafka
+            if isinstance(message, bytes):
+                hex_preview = message[:50].hex()  # Get the first 50 bytes as hex for logging
+                logger.debug("Received binary message (hex preview): %s", hex_preview)
+            else:
+                logger.debug("Received text message: %s", message)
 
+            ''' 
             try:
                 parsed_data = json.loads(message)
                 await push_to_kafka(parsed_data)
             except json.JSONDecodeError as e:
                 logger.error("Failed to parse message as JSON: %s", str(e))
                 continue  # Skip this message and continue receiving the next one
+            '''
+            
 
         except websockets.ConnectionClosed:
             logger.warning("WebSocket connection closed. Attempting to reconnect...")
@@ -104,7 +134,7 @@ async def main():
 
                 # Subscribe once after connection is established
                 await subscribe_to_data(websocket, config.SYMBOL_TICKERS)
-
+ 
                 # Start receiving in this same connection
                 await data_receiver(websocket)
 
