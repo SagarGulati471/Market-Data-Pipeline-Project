@@ -1,8 +1,6 @@
 ## Market Data Pipeline Project
 The project aims for the real time stock market data collection, cleaning it, processing it and making it ready for backtesting. As we expand the scope I plan to build different pipelines for different set of indicators, generating buy/sell signals based on different strategies.
 
-## References
-
 ### Architecture Design
 Link - https://app.diagrams.net/#G1XzVCH1INkYbS2aGT_wJ4cgXVnr5ShD6k#%7B%22pageId%22%3A%22-xqMkZ9DFNTepwFP1atR%22%7D
 
@@ -43,7 +41,6 @@ Pass the authentication token to the APIs
 
 # About Protobuf format
 
-
 ### Steps to setup Protobuf
 
 For Windows - 
@@ -58,7 +55,7 @@ For Windows -
 **To create the protobuf files according to your programming language**
 
 * 1.) Create a <filename>.proto file and add the schema in that, usually the organizations provide this schema info with their API documentation
-* 2.) Once schemas are ready in the .proto file, then add run the command - "protoc --python_out=. <filename>.proto"
+* 2.) Once schemas are ready in the .proto file, then add run the command - "protoc --python_out=. --proto_path=. <filename>.proto"
 * 3.) This will create a file <filename>_pb2.py (.py for python)
 * 4.) Now we can import this file in our code and extract the binary being received by the websocket according to the datatytpes
 
@@ -70,6 +67,13 @@ For Windows -
 
 
 
+## References
+
+* About Protbuf - https://protobuf.dev/getting-started/
+* FyersAPI TBT Documentation - https://myapi.fyers.in/docsv3#tag/Tbtws/paths/~1TBTWebsocketUsageGuide/get
+* Trading Bot Reference project - https://github.com/arvind10799/tradingbot/blob/main/trading_bot/bot/logging_config.py
+* Fyers API sample usage (Marketcalls) - https://github.com/marketcalls/fyers-websockets
+* Fyers API sample usage (Marketcalls) - https://www.marketcalls.in/python/a-simple-guide-to-using-fyers-tbt-feed-via-websocket-with-protobuf-python-tutorial.html
 
 ### Contributor
 Sagar Gulati
