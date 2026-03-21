@@ -9,9 +9,8 @@ from dotenv import load_dotenv
 from utils.logger import setup_logger
 from generate_token import TokenManager
 from config.config import Config
+from data_collector import msg_pb2
 
-# Initialize the logger
-setup_logger()
 logger = logging.getLogger(__name__)
 
 
@@ -65,18 +64,62 @@ async def subscribe_to_data(websocket, symbol_tickers):
         logger.info(f"Resume message sent: {resume_msg}")
 
     except Exception as e:
-        logger.error(f"Error occured while subcribing to symbols: {e}")
-
-
-
-
-
+        logger.error(f"Exception occured while subcribing to symbols: {e}")
 
 
 async def push_to_kafka(data):
     # Placeholder function to push data to Kafka
     logger.info("Pushing data to Kafka: %s", data)
 
+
+# async def data_receiver(websocket):
+#     """
+#     Continuously receive messages from WebSocket.
+#     """
+#     while True:
+#         try:
+#             message = await websocket.recv()
+#             logger.debug("Received message: %s", message)
+#             # Here we can add code to push the received data to Kafka
+
+#             try:
+#                 parsed_data = json.loads(message)
+#                 await push_to_kafka(parsed_data)
+#             except json.JSONDecodeError as e:
+#                 logger.error("Failed to parse message as JSON: %s", str(e))
+#                 continue  # Skip this message and continue receiving the next one
+
+#         except websockets.ConnectionClosed:
+#             logger.warning("WebSocket connection closed. Attempting to reconnect...")
+#             break  # Exit the loop to allow for reconnection
+#         except Exception as e:
+#             logger.error("Error receiving data: %s", str(e))
+#             break  # Exit the loop to allow for reconnection
+
+def process_data(message):
+    # logger.info("Processing data ",message)
+    try:
+        socket_message = msg_pb2.SocketMessage()
+        socket_message.ParseFromString(message)
+        
+        if socket_message.error:
+            print(f"Error in socket message: {socket_message.msg}")
+            return None
+            
+        market_data = {}
+        for symbol, feed in socket_message.feeds.items():
+            print(f"symbol = {symbol}, feed = {feed}")
+            depth_data = {
+                'symbol': symbol,
+                'timestamp': feed.feed_time.value,
+                'total_bid_qty': feed.depth.tbq.value,
+                'total_sell_qty': feed.depth.tsq.value,
+                'bids': [],
+                'asks': []
+            }
+            print(f"Depth data {depth_data}")
+    except Exception as e:
+        print("Exception", e)
 
 async def data_receiver(websocket):
     """
@@ -86,28 +129,21 @@ async def data_receiver(websocket):
         try:
             message = await websocket.recv()
             logger.debug("Received message: %s", message)
-            if isinstance(message, bytes):
-                hex_preview = message[:50].hex()  # Get the first 50 bytes as hex for logging
-                logger.debug("Received binary message (hex preview): %s", hex_preview)
-            else:
-                logger.debug("Received text message: %s", message)
+            # Here we can add code to push the received data to Kafka
 
-            ''' 
             try:
                 parsed_data = json.loads(message)
                 await push_to_kafka(parsed_data)
             except json.JSONDecodeError as e:
                 logger.error("Failed to parse message as JSON: %s", str(e))
                 continue  # Skip this message and continue receiving the next one
-            '''
-            
 
-        except websockets.ConnectionClosed:
-            logger.warning("WebSocket connection closed. Attempting to reconnect...")
-            break  # Exit the loop to allow for reconnection
+        except websockets.ConnectionClosed as e:
+            logger.warning(f"Connection closed: code={e.code}, reason={e.reason}")
+            break
         except Exception as e:
-            logger.error("Error receiving data: %s", str(e))
-            break  # Exit the loop to allow for reconnection
+            logger.error(f"Recv error: {str(e)}")
+            break
 
 
 async def main():
@@ -134,7 +170,7 @@ async def main():
 
                 # Subscribe once after connection is established
                 await subscribe_to_data(websocket, config.SYMBOL_TICKERS)
- 
+
                 # Start receiving in this same connection
                 await data_receiver(websocket)
 
@@ -147,7 +183,7 @@ async def main():
 
 if __name__ == "__main__":
     
-    # Set up logging configuration 
+    # Set up logging configuration
     setup_logger()
     
     # Run the main function in an asyncio event loop
