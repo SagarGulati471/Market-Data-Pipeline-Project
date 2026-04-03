@@ -144,8 +144,8 @@ You can name them anything (PLAINTEXT, CLIENT, DOCKER, etc.). The name just has 
 
 
 ## Some Extra Points
-To check if the port is not blocked by any firewall 
-nc -zv <IP ADDR> 9092
+* <b> To check if the port is not blocked by any firewall</b>  - nc -zv \<IP ADDR> 9092
+* <b>Check IP Address in your MAC</b> ipconfig getifaddr en0
 
 ## Contributor
 Sagar Gulati
