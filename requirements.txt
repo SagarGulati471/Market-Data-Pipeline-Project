@@ -3,3 +3,4 @@ python-dotenv
 websockets
 uvicorn
 protobuf
+aiokafka
