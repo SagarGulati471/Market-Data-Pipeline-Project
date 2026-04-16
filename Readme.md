@@ -75,6 +75,31 @@ For Windows -
 * Fyers API sample usage (Marketcalls) - https://github.com/marketcalls/fyers-websockets
 * Fyers API sample usage (Marketcalls) - https://www.marketcalls.in/python/a-simple-guide-to-using-fyers-tbt-feed-via-websocket-with-protobuf-python-tutorial.html
 
+
+## Design - 
+
+Seperate Folders for seperate brokers 
+For each of the broker we will have an entry point file which will when started can actually start polling 
+The symbols to be polled will be fetched from the ENV file
+The data for one broker will be pushed to one Kafka Topic
+
+After receiving the data from the websocket we can transform it into json and try pushing it into the common format so that same consumer pipelines can be used for the brokers data. If data is quite different then we can have an ENV variable which will mention about which consumer to start, so when we will spawn the consumer pod the pod will pick the correct Processing function.
+
+
+1.) 
+Data1 stream1 (broker1 - US stock data) 
+Data1 stream2 (broker2 - Indian stock data) 
+
+
+2.) Both will send to kafka(seperate topics)
+
+
+3.) These consumers will be running as PODs or docker containers and there will be an entry point which will connect to the Kafka and starts consuming, now for the processing logic there will be a conditional check about which set of data to be processed, Indian stocks or US stocks. If we are successful in transforming the data from both the brokers to the same format then there will be just one logic, else different logics but the code base will remain the same, for consumer pods of both the brokers will contain all the code, but only some of it will be executed.
+
+
+Things to consider
+Will be worth transforming the data after receiving from websocket just to convert it to a common format, it can add additional latency, will just writing seperate processing logics be more 
+
 ### Contributor
 Sagar Gulati
 

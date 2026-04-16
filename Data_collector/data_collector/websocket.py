@@ -103,12 +103,11 @@ def process_data(message):
         socket_message.ParseFromString(message)
         
         if socket_message.error:
-            print(f"Error in socket message: {socket_message.msg}")
+            logger.info(f"Error in socket message: {socket_message.msg}")
             return None
             
         market_data = {}
         for symbol, feed in socket_message.feeds.items():
-            print(f"symbol = {symbol}, feed = {feed}")
             depth_data = {
                 'symbol': symbol,
                 'timestamp': feed.feed_time.value,
@@ -117,9 +116,9 @@ def process_data(message):
                 'bids': [],
                 'asks': []
             }
-            print(f"Depth data {depth_data}")
+            logger.info(f"Depth data {depth_data}")
     except Exception as e:
-        print("Exception", e)
+        logger.info("Exception", e)
 
 async def data_receiver(websocket):
     """
@@ -132,8 +131,8 @@ async def data_receiver(websocket):
             # Here we can add code to push the received data to Kafka
 
             try:
-                parsed_data = json.loads(message)
-                await push_to_kafka(parsed_data)
+                depth_data = process_data(message)
+                await push_to_kafka(depth_data)
             except json.JSONDecodeError as e:
                 logger.error("Failed to parse message as JSON: %s", str(e))
                 continue  # Skip this message and continue receiving the next one
@@ -157,8 +156,14 @@ async def main():
     # Create auth header from auth info obtained
     auth_header = f"{config.CLIENT_ID}:{config.ACCESS_TOKEN}"
 
+    retries = 0
     # Establish Websocket Connection
     while True:
+        if retries > 0:
+            logger.info(f"Retrying WebSocket connection... Attempt #{retries}")
+        if retries >= config.WEBSOCKET_MAX_RETRIES:
+            logger.error("Max retries reached. Exiting WebSocket client.")
+            return
         try:
             async with websockets.connect(
                         config.WEBSOCKET_URL,
@@ -176,10 +181,10 @@ async def main():
 
                 # Subscribe to the required stock symbols to receive real-time data
         except Exception as e:
+            retries += 1
             logger.error("Error connecting to WebSocket: %s", str(e))
-            return
-        
-        
+            await asyncio.sleep(config.WEBSOCKET_RETRY_INTERVAL)
+            continue
 
 if __name__ == "__main__":
     
