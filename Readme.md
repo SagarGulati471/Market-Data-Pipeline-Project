@@ -167,6 +167,12 @@ project-root/
 
 
 
+## To start the data collector execute the following in the order - 
+
+* cd Market_Data_Pipeline_Project/Project-Root
+* python -m data_collectors.fyers.websocket
+
+
 
 ### Contributor
 Sagar Gulati
