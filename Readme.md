@@ -100,6 +100,74 @@ Data1 stream2 (broker2 - Indian stock data)
 Things to consider
 Will be worth transforming the data after receiving from websocket just to convert it to a common format, it can add additional latency, will just writing seperate processing logics be more 
 
+
+# Project Structure  
+#### ( April - 16)
+
+## Data collectors from different brokers 
+* Fyers DataCollector
+* FinnHub DataCollector
+Each of these data collectors will have a consumer file which will establish the connection to kafka and push the data
+It will use a dir called kafka service, which will have kafka_service.py file , which contains all wrappers for producer, consumer, topic creation etc
+
+## Kafka-Deployment
+This dir contains the kafka and kafka-UI service related data
+* docker-compose file
+* kafka-data dir - this is a volume mount
+
+
+# Ingestion Engine
+Fyers consumer
+Finnhub Consumer
+ProcessingFunctions
+
+
+There are two options either we send the data to kafka in the same format, in this case we need to do some processing before sending to kafka, or second option is that we transform it after receiving the data from kafka. if we do transformation after receiving from kafka then we need to use different consumers, after pre-processing , we can just use common processing/strategy/alerting functions
+
+
+Also, I am thinking from the deployment purpose also, I am thinking to keep data collectors, kafka, Ingestion Engine to be seperate (ingestion engine can have multiple consumers so we can achieve some parallel processing, and the container of data collectors can have more resources so it can easily push to kafka, additionally all logics will be written using asyncio)
+
+
+project-root/
+
+├── collectors/
+│   ├── fyers/
+│   ├── finnhub/
+│
+├── messaging/
+│   ├── kafka/
+│   ├── internal_bus/
+│
+├── ingestion/
+│   ├── normalizer.py
+│   ├── validators.py
+│
+├── core/
+│   ├── events.py
+│   ├── models.py
+│
+├── strategy/
+│   ├── base.py
+│   ├── momentum.py
+│   ├── mean_reversion.py
+│
+├── execution/
+│   ├── engine.py
+│   ├── orderbook.py
+│
+├── backtesting/
+│   ├── engine.py
+│
+├── infra/
+│   ├── docker/
+│   ├── kafka/
+│
+├── configs/
+├── logs/
+
+
+
+
 ### Contributor
 Sagar Gulati
 

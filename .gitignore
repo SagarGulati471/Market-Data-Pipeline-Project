@@ -3,7 +3,9 @@ myvenv/
 .env
 *.log
 *_test*
-
+__pycache__/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
+Data_collector/kafka/kafka_data/
+.Data_collector/kafka/kafka_data/

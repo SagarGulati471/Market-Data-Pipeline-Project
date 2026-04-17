@@ -1,4 +1,5 @@
-from fyers_auth.fyers_auth import FyersAuth
+# from Data_collector.data_collectors.fyers.fyers_auth.fyers_auth import FyersAuth
+from .fyers_auth.fyers_auth import FyersAuth
 import os
 from config.config import Config
 import logging
