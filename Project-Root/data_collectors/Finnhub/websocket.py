@@ -44,7 +44,7 @@ async def subscribe_to_data(websocket, symbol_tickers=None):
         logger.error(f"Exception occured while subcribing to symbols: {e}")
 
 
-async def task_push_to_kafka(data, config):
+async def task_push_to_kafka(config):
     '''
     Fetches data from the queue and pushes it to Kafka.
     Any pre-processing of the data can be done here before sending to Kafka in process_data_from_queue function.
@@ -53,10 +53,12 @@ async def task_push_to_kafka(data, config):
     KAFKA_TOPIC = config.FINNHUB_KAFKA_TOPIC  # Replace with your actual Kafka topic name
     KEY = f"TBT_data_{int(time.time() * 1000)}"  # Example key using current timestamp in milliseconds
     
+    logger.info("Sending message---")
     # Creates a Kafka producer instance
     producer = await create_kafka_producer()
     while True:
         try:
+            
             message = await data_queue.get()  # Wait until a message is available in the queue
             logger.debug("Processing message from queue: %s", message)
 
@@ -67,10 +69,7 @@ async def task_push_to_kafka(data, config):
 
         except Exception as e:
             logger.error(f"Error processing message from queue: {e}")
-
-    
-    # Placeholder function to push data to Kafka
-    logger.info("Pushing data to Kafka: %s", data)
+   
 
 
 # Extra functions for data processing can be added here.
@@ -89,10 +88,14 @@ async def data_receiver(websocket):
     '''
     Continuously receive messages from WebSocket and add them to the processing queue.
     '''
+    logger.info("data receiver called")
     while True:
         try:
             message = await websocket.recv()
-            logger.debug("Received message: %s", message)
+            # logger.debug("Received message: %s, %d", message, len(message))
+            logger.debug("Received message: len = %d",len(message))
+            # logger.info(f"\n\n\n\n data_queue = {data_queue} , len = {data_queue.qsize()}, \n\n\n\n")
+            logger.info(f"\n\n len of queue = {data_queue.qsize()}, \n\n\n\n")
 
             try:
                 data_queue.put_nowait(message)  # Add raw message to the queue for processing
@@ -115,7 +118,7 @@ async def main():
     logger.info("Connecting to WebSocket...")
     
     config = await load_config()
-    asyncio.create_task(task_push_to_kafka(config))  # Start the data processing task
+    kafka_task = asyncio.create_task(task_push_to_kafka(config))  # Start the data processing task
 
     retries = 0
     # Establish Websocket Connection
@@ -126,10 +129,7 @@ async def main():
             logger.error("Max retries reached. Exiting WebSocket client.")
             return
         try:
-            async with websockets.connect(config.FINNHUB_WEBSOCKET_URI) as ws:
-                websocket = ws
-
-                await asyncio.gather(task_push_to_kafka(), return_exceptions=True)
+            async with websockets.connect(config.FINNHUB_WEBSOCKET_URI) as websocket:
 
                 # Subscribe once after connection is established
                 await subscribe_to_data(websocket)                
@@ -141,10 +141,13 @@ async def main():
             retries += 1
             logger.error("Error connecting to WebSocket: %s", str(e))
             task_push_to_kafka.cancel()
-
-
             await asyncio.sleep(config.WEBSOCKET_RETRY_INTERVAL)
-            continue
+
+        kafka_task.cancel()
+        await asyncio.gather(task_push_to_kafka(config), return_exceptions=True)
+
+
+        
 
 
 if __name__ == "__main__":

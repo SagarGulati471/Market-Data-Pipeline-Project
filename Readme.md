@@ -167,6 +167,8 @@ project-root/
 - Start venv - .\venv\Scripts\Activate
 - python3 -m data_collectors.fyers.websocket
 
+- to install python3 -m pip install <module_name>
+
 ### MAC
 
 - cd Market_Data_Pipeline_Project/Project-Root
@@ -175,3 +177,4 @@ project-root/
 ### Contributor
 
 Sagar Gulati
+```
