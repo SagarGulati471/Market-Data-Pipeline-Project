@@ -26,6 +26,14 @@ path inside container - /opt/kafka/bin
 ./kafka-console-producer.sh --bootstrap-server localhost:9092 --topic test-topic
 
 
+#### List the messages
+./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic market_data --from-beginning
+
+
+
+## To Access Kafka-UI
+URL - http://localhost:8080/ui/clusters/TBT-Data/all-topics
+Please replace "localhost" with the IP of the node if kafka and Kafka-ui service are exposed externally
 
 
 ## Explanation
@@ -57,6 +65,16 @@ A transport protocol configuration, not a listener name
 | SASL_PLAINTEXT | Auth only         |
 | SASL_SSL       | Auth + encryption |
 
+
+
+
+                ┌──────────────────────┐
+                │      Kafka Broker     │
+                │                      │
+                │ INTERNAL : 9092      │◄── Docker containers
+                │ EXTERNAL : 9093      │◄── Your Python app
+                │ CONTROLLER: 29093    │◄── Kafka internal
+                └──────────────────────┘
 
 
 ### About the consensus
