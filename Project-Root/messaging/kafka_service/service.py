@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 # Function to create and return an aiokafka producer instance
 async def create_kafka_producer():
     config = Config()
-    bootstrap_servers='127.0.0.1:9092'
-    bootstrap_servers='localhost:9092'
+    # bootstrap_servers='127.0.0.1:9092'
+    bootstrap_servers='localhost:9093'
     producer = aiokafka.AIOKafkaProducer(
         # bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
         bootstrap_servers=bootstrap_servers

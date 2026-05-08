@@ -14,8 +14,6 @@ from messaging.kafka_service.service import *
 logger = logging.getLogger(__name__)
 
 
-data_queue = asyncio.Queue(maxsize=100000)  # Queue to hold incoming data for processing
-
 async def load_config():
     '''
     Load configuration settings from environment variables and return a Config object.
@@ -25,7 +23,7 @@ async def load_config():
     return config
 
 
-async def subscribe_to_data(websocket, symbol_tickers=None):
+async def subscribe_to_data(websocket, config):
     '''
     Send a subscription message to the WebSocket to subscribe to the specified symbol tickers."""
     '''
@@ -33,12 +31,19 @@ async def subscribe_to_data(websocket, symbol_tickers=None):
         logger.error("WebSocket connection is not established. Cannot subscribe to data.")
         return
     
+    symbol_tickers = config.FINNHUB_STOCK_SYMBOLS
+
     logger.info(f"Sbscribing to symbols: {symbol_tickers}")
     try:
-        subscribe_msg = {"type": "subscribe", "symbol": "BINANCE:BTCUSDT"}
-        # subscribe_msg = {"type": "subscribe", "symbol": config.FINNHUB_STOCK_SYMBOLS[0]}
-        await websocket.send(json.dumps(subscribe_msg))
-        logger.info(f"Subscription message sent: {subscribe_msg}")
+
+        for symbol_ticker in symbol_tickers:
+       
+            # subscribe_msg = {"type": "subscribe", "symbol": "BINANCE:BTCUSDT"}
+            subscribe_msg = {"type": "subscribe", "symbol": symbol_ticker}
+
+            logger.debug(f"Subscribing to symbol: {subscribe_msg}")
+            await websocket.send(json.dumps(subscribe_msg))
+            logger.info(f"Subscription message sent: {subscribe_msg}")
 
     except Exception as e:
         logger.error(f"Exception occured while subcribing to symbols: {e}")
@@ -53,49 +58,30 @@ async def task_push_to_kafka(config):
     KAFKA_TOPIC = config.FINNHUB_KAFKA_TOPIC  # Replace with your actual Kafka topic name
     KEY = f"TBT_data_{int(time.time() * 1000)}"  # Example key using current timestamp in milliseconds
     
-    logger.info("Sending message---")
     # Creates a Kafka producer instance
     producer = await create_kafka_producer()
     while True:
         try:
-            
             message = await data_queue.get()  # Wait until a message is available in the queue
+            await asyncio.sleep(0)
             logger.debug("Processing message from queue: %s", message)
 
             # Process the data and push to Kafka
             await send_message(producer, KAFKA_TOPIC, KEY, message)
 
-            data_queue.task_done()  # Mark the message as processed
-
         except Exception as e:
             logger.error(f"Error processing message from queue: {e}")
-   
-
-
-# Extra functions for data processing can be added here.
-# For example, if we want to parse the raw message and extract specific fields before sending to Kafka, 
-# can use this function
-
-# async def process_data_from_queue(message):
-#     logger.info("Processing data ",message)
-#     try:
-#        pass
-#     except Exception as e:
-#         logger.info("Exception", e)
 
 
 async def data_receiver(websocket):
     '''
     Continuously receive messages from WebSocket and add them to the processing queue.
     '''
-    logger.info("data receiver called")
+    logger.info("data receiver called...")
     while True:
         try:
             message = await websocket.recv()
-            # logger.debug("Received message: %s, %d", message, len(message))
-            logger.debug("Received message: len = %d",len(message))
-            # logger.info(f"\n\n\n\n data_queue = {data_queue} , len = {data_queue.qsize()}, \n\n\n\n")
-            logger.info(f"\n\n len of queue = {data_queue.qsize()}, \n\n\n\n")
+            logger.debug(f"Current Size of Queue: {data_queue.qsize()} \n")
 
             try:
                 data_queue.put_nowait(message)  # Add raw message to the queue for processing
@@ -132,7 +118,7 @@ async def main():
             async with websockets.connect(config.FINNHUB_WEBSOCKET_URI) as websocket:
 
                 # Subscribe once after connection is established
-                await subscribe_to_data(websocket)                
+                await subscribe_to_data(websocket, config)                
 
                 # Start receiving in this same connection
                 await data_receiver(websocket)
@@ -140,21 +126,22 @@ async def main():
         except Exception as e:
             retries += 1
             logger.error("Error connecting to WebSocket: %s", str(e))
-            task_push_to_kafka.cancel()
+            # kafka_task.cancel()
             await asyncio.sleep(config.WEBSOCKET_RETRY_INTERVAL)
+        finally:
 
-        kafka_task.cancel()
-        await asyncio.gather(task_push_to_kafka(config), return_exceptions=True)
-
-
-        
+            kafka_task.cancel()
+            await asyncio.gather(kafka_task, return_exceptions=True)
+            
 
 
 if __name__ == "__main__":
     
     # Set up logging configuration
     setup_logger()
-    
+
+    data_queue = asyncio.Queue(maxsize=100000)  # Queue to hold incoming data for processing
+
     # Run the main function in an asyncio event loop
     try:
         asyncio.run(main())
