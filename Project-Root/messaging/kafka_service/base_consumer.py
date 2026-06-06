@@ -39,25 +39,33 @@ class KafkaConsumerService:
         logger.info(f"Consumer started: topic={self.topic}, group={self.group_id}")
         try:
             await self._run()
+        except Exception as e:
+            logger.debug(f"Exception occured in consumer: {e}")
+            raise e
         finally:
             await self._consumer.stop()
             logger.info(f"Consumer stopped: topic={self.topic}")
 
     async def _run(self):
-        async for msg in self._consumer:
-            if self._stop_event.is_set():
-                break
+
+        msg = None
+        while not self._stop_event.is_set():
             try:
+                msg = await asyncio.wait_for(self._consumer.getone(), timeout=1.0)
+                # await self._consumer.getone()
                 await self.message_handler(msg)
-                await self._consumer.commit()           # commit only after success
-            except Exception:
+                await self._consumer.commit()
+
+            except asyncio.TimeoutError:
+                continue
+            
+            except Exception as e:
                 logger.exception(
                     f"Failed to process message: topic={msg.topic} "
                     f"partition={msg.partition} offset={msg.offset}"
+                    f"message={msg}"
                 )
-                # Do NOT commit — message will be retried on restart
-                # Later: send to a dead-letter topic here
-
+                
     async def stop(self):
         logger.info("Shutdown signal received.")
         self._stop_event.set()
