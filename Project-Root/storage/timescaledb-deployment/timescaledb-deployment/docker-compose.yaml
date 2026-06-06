@@ -1,0 +1,43 @@
+
+
+services:
+  timescale:
+    image: timescale/timescaledb:latest-pg16
+    container_name: timescale
+    environment:
+    - POSTGRES_USER=postgres
+    - POSTGRES_PASSWORD=postgres
+    - POSTGRES_DB=marketdata
+    ports:
+    - "5432:5432"
+    volumes:
+    # - timescale-data:/Users/sagar/Documents/market-data-pipeline/Market-Data-Pipeline-Project/Project-Root/timescaledb-deployment/timescale-data
+    # - ./init-scripts:/Users/sagar/Documents/market-data-pipeline/Market-Data-Pipeline-Project/Project-Root/timescaledb-deployment/migrations/001_create_tables.sql
+    - ./timescale-data:/var/lib/postgresql/data # Defining named volume
+    - ./migrations:/docker-entrypoint-initdb.d
+    restart: always
+  
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+    - PGADMIN_DEFAULT_EMAIL=admin@example.com
+    - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+    - "5050:80"
+    volumes:
+    - ./docker/pgadmin/pgpass:/pgadmin4/pgpass
+    - ./docker/pgadmin/servers.json:/pgadmin4/servers.json
+    # entrypoint: >
+    #   /bin/sh -c "
+    #   mkdir -m 700 -p /var/lib/pgadmin/storage/admin_example.com;
+    #   cp /pgadmin4/pgpass /var/lib/pgadmin/storage/admin_example.com/;
+    #   chmod 600 /var/lib/pgadmin/storage/admin_example.com/pgpass;
+    #   /entrypoint.sh
+    #   "
+    depends_on:
+    - timescale
+
+
+volumes:
+  timescale-data:
