@@ -1,7 +1,7 @@
 
 
 
-#### Steps to execute the consumer
+### Steps to execute the consumer
 
 
 1.) Navigate to the path
@@ -17,7 +17,7 @@ python3 -m consumers.normalizer.consumer
 
 
 
-## About Kafka polling mechanism
+### About Kafka polling mechanism
 
 Kafka consumers read data from Kafka topics by establishing an active, pull-based connection to the brokers. They work in parallel using Consumer Groups, coordinate work through partition assignments, and use Offsets to track their reading progress. 
 
