@@ -4,3 +4,4 @@ websockets
 uvicorn
 protobuf
 aiokafka
+asyncpg
