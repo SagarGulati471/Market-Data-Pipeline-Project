@@ -17,6 +17,66 @@ python3 -m consumers.normalizer.consumer
 
 
 
+
+---
+
+### Dead Letter Topic (DLT)
+
+#### What problem does a DLT solve?
+
+In a Kafka-based pipeline, messages within a partition are processed sequentially. If a consumer encounters a malformed, invalid, or unexpected message and repeatedly fails to process it, the consumer cannot advance beyond that offset.
+
+This creates a **"poison pill" message** situation, where a single bad record blocks all subsequent messages in the same partition from being processed.
+
+#### How can a bad message stall the pipeline?
+
+Consider the following sequence:
+
+* Offset 100 → Processed successfully
+* Offset 101 → Processed successfully
+* Offset 102 → Processing fails
+* Offset 103 → Valid message
+* Offset 104 → Valid message
+
+If offset 102 is never acknowledged (committed), Kafka continues to deliver the same failed message whenever the consumer retries or restarts. As a result:
+
+* *Offset* 102 keeps failing.
+* Offsets 103 and 104 are never reached.
+* The partition becomes effectively stalled.
+
+A single bad message can therefore block thousands or millions of valid messages behind it.
+
+#### What is a Dead Letter Topic?
+
+A Dead Letter Topic (DLT) is a dedicated Kafka topic used to store messages that cannot be processed successfully.
+
+Instead of repeatedly retrying the same failing message, the consumer:
+
+1. Copies the original message to the DLT.
+2. Records failure details such as the error, source topic, partition, and offset.
+3. Commits the original offset.
+4. Continues processing the next message.
+
+This allows the pipeline to continue operating while preserving the failed record for later investigation.
+
+#### Why is a DLT useful?
+
+* Prevents a single bad message from blocking an entire partition.
+* Preserves failed messages instead of silently dropping them.
+* Enables debugging and root-cause analysis.
+* Allows failed records to be replayed after the underlying issue is fixed.
+* Improves overall reliability and availability of the streaming system.
+
+#### Design Principle
+
+The DLT mechanism prioritizes continuous pipeline operation. Failed messages are isolated and stored for later analysis, while valid messages continue to flow through the system without interruption.
+
+
+
+---
+
+
+# About Kafka
 ### About Kafka polling mechanism
 
 Kafka consumers read data from Kafka topics by establishing an active, pull-based connection to the brokers. They work in parallel using Consumer Groups, coordinate work through partition assignments, and use Offsets to track their reading progress. 

@@ -30,6 +30,7 @@ class Config:
         self.FINNHUB_STOCK_SYMBOLS = os.getenv('FINNHUB_STOCK_SYMBOLS', 'BINANCE:BTCUSDT,OANDA:EUR_USD').strip("'").split(',')
         self.KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BROKER_URL', 'localhost:9093')
         self.FINNHUB_KAFKA_TOPIC = os.getenv('FINNHUB_KAFKA_TOPIC', 'market_data')
+        self.DEAD_LETTER_TOPIC_NORMALIZER = os.getenv('DEAD_LETTER_TOPIC_NORMALIZER', 'normalizer-dlt')
         return self
 
     def setEnvVariable(self, key, value, overwrite=True, add_to_file=False):

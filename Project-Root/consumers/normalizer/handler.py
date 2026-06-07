@@ -4,6 +4,11 @@ from .models import Trade
 
 logger = logging.getLogger(__name__)
 
+# Finnhub condition codes that mark a trade as invalid for OHLCV and analytics.
+# "8" = Out of Sequence — a late-reported or corrected trade carrying a stale price.
+# Including these corrupts high/low/close calculations in the candle builder.
+_EXCLUDED_CONDITIONS = frozenset({"8"})
+
 
 async def handle_message(msg):
     """
@@ -25,9 +30,18 @@ async def handle_message(msg):
         return
 
     for item in payload.get("data", []):
+        # Exclude trades flagged with invalid condition codes before validation.
+        # Checked on the raw dict to avoid building a Trade object unnecessarily.
+        conditions = item.get("c") or []
+        if _EXCLUDED_CONDITIONS.intersection(conditions):
+            logger.debug(
+                f"Skipping excluded trade: symbol={item.get('s')}, conditions={conditions}"
+            )
+            continue
+
         try:
-            trade = Trade(**item)
-            logger.info(f"Trade: {trade}")
+            trade = Trade.model_validate(item)
+            logger.debug(f"Trade validated: {trade}")
             # TODO: produce to 'trades-normalized' topic
         except Exception:
             logger.exception(f"Validation failed for item: {item}")

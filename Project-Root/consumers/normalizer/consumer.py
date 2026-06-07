@@ -6,6 +6,7 @@ from utils.logger import setup_logger
 from config.config import Config
 from messaging.kafka_service.base_consumer import KafkaConsumerService
 from .handler import handle_message
+from messaging.kafka_service.service import create_kafka_producer
 
 setup_logger()
 logger = logging.getLogger(__name__)
@@ -19,6 +20,8 @@ async def main():
         group_id="normalizer-group",
         bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,   # 'localhost:9092'
         message_handler=handle_message,
+        dlt_topic =config.DEAD_LETTER_TOPIC_NORMALIZER,                     # Optional: topic for dead-lettered messages
+        dlt_producer= create_kafka_producer()                     # Optional: aiokafka producer instance for sending to DLT
     )
 
     # Graceful shutdown on Ctrl+C or SIGTERM (for Kubernetes pods)
