@@ -28,7 +28,7 @@ class Config:
         self.FINNHUB_API_TOKEN = os.getenv("FINNHUB_API_TOKEN", "")
         self.FINNHUB_WEBSOCKET_URI= os.getenv("FINNHUB_WEBSOCKET_URI", f"wss://ws.finnhub.io?token={self.FINNHUB_API_TOKEN}").strip("'")
         self.FINNHUB_STOCK_SYMBOLS = os.getenv('FINNHUB_STOCK_SYMBOLS', 'BINANCE:BTCUSDT,OANDA:EUR_USD').strip("'").split(',')
-        self.KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BROKER_URL', 'localhost:9092')
+        self.KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BROKER_URL', 'localhost:9093')
         self.FINNHUB_KAFKA_TOPIC = os.getenv('FINNHUB_KAFKA_TOPIC', 'market_data')
         return self
 

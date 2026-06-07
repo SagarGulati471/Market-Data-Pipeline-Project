@@ -5,3 +5,4 @@ uvicorn
 protobuf
 aiokafka
 asyncpg
+pydantic

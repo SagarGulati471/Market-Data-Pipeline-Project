@@ -1,11 +1,9 @@
 import aiokafka
 from config.config import Config
 from utils.logger import setup_logger
-import asyncio
 import logging
 import json
-
-
+from aiokafka import AIOKafkaProducer
 setup_logger()
 logger = logging.getLogger(__name__)
 
@@ -15,7 +13,7 @@ async def create_kafka_producer():
     config = Config()
     # bootstrap_servers='127.0.0.1:9092'
     bootstrap_servers='localhost:9093'
-    producer = aiokafka.AIOKafkaProducer(
+    producer = AIOKafkaProducer(
         # bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
         bootstrap_servers=bootstrap_servers
         # security_protocol=config.KAFKA_SECURITY_PROTOCOL,
