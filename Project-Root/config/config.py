@@ -31,6 +31,13 @@ class Config:
         self.KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BROKER_URL', 'localhost:9093')
         self.FINNHUB_KAFKA_TOPIC = os.getenv('FINNHUB_KAFKA_TOPIC', 'market_data')
         self.DEAD_LETTER_TOPIC_NORMALIZER = os.getenv('DEAD_LETTER_TOPIC_NORMALIZER', 'normalizer-dlt')
+        self.KAFKA_TOPIC_NORMALIZED_TRADES = os.getenv('KAFKA_TOPIC_NORMALIZED_TRADES', 'trades-normalized')
+        # TimescaleDB / PostgreSQL connection settings
+        self.DB_HOST     = os.getenv('DB_HOST',     'localhost')
+        self.DB_PORT     = os.getenv('DB_PORT',     '5432')
+        self.DB_NAME     = os.getenv('DB_NAME',     'marketdata')
+        self.DB_USER     = os.getenv('DB_USER',     'postgres')
+        self.DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
         return self
 
     def setEnvVariable(self, key, value, overwrite=True, add_to_file=False):

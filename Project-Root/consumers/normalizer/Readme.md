@@ -28,6 +28,8 @@ In a Kafka-based pipeline, messages within a partition are processed sequentiall
 
 This creates a **"poison pill" message** situation, where a single bad record blocks all subsequent messages in the same partition from being processed.
 
+A "poison pill message" typically refers to a malformed or corrupt data packet in event-driven systems (like Apache Kafka or RabbitMQ) that consistently crashes the receiving application.
+
 #### How can a bad message stall the pipeline?
 
 Consider the following sequence:
