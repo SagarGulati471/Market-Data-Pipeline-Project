@@ -1,4 +1,4 @@
-## Market Data Pipeline Project
+## Market Data Pipeline Project (In Progress)
 
 The project aims for the real time stock market data collection, cleaning it, processing it and making it ready for backtesting. As we expand the scope I plan to build different pipelines for different set of indicators, generating buy/sell signals based on different strategies.
 
