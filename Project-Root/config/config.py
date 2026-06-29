@@ -32,6 +32,8 @@ class Config:
         self.FINNHUB_KAFKA_TOPIC = os.getenv('FINNHUB_KAFKA_TOPIC', 'market_data')
         self.DEAD_LETTER_TOPIC_NORMALIZER = os.getenv('DEAD_LETTER_TOPIC_NORMALIZER', 'normalizer-dlt')
         self.KAFKA_TOPIC_NORMALIZED_TRADES = os.getenv('KAFKA_TOPIC_NORMALIZED_TRADES', 'trades-normalized')
+        self.KAFKA_TOPIC_CANDLES = os.getenv('KAFKA_TOPIC_CANDLES', 'candles')
+        self.DEAD_LETTER_TOPIC_CANDLE_BUILDER = os.getenv('DEAD_LETTER_TOPIC_CANDLE_BUILDER', 'candle-builder-dlt')
         # TimescaleDB / PostgreSQL connection settings
         self.DB_HOST     = os.getenv('DB_HOST',     'localhost')
         self.DB_PORT     = os.getenv('DB_PORT',     '5432')

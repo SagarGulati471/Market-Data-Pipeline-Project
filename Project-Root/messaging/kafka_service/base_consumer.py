@@ -37,7 +37,7 @@ class KafkaConsumerService:
             bootstrap_servers=self.bootstrap_servers,
             group_id=self.group_id,
             auto_offset_reset=self.auto_offset_reset,
-            enable_auto_commit=False,                    # manual commit — see note below
+            enable_auto_commit=False,                  
         )
         await self._consumer.start()
         logger.info(f"Consumer started: topic={self.topic}, group={self.group_id}")
@@ -47,6 +47,7 @@ class KafkaConsumerService:
             logger.exception(f"Exception occured in consumer: {e}")
             raise e
         finally:
+            # Handles the CTRL+C scenario / SIGTERM shutdown signal. Ensures the consumer is stopped cleanly.
             await self._consumer.stop()
             logger.info(f"Consumer stopped: topic={self.topic}")
 
@@ -63,9 +64,9 @@ class KafkaConsumerService:
             except asyncio.TimeoutError:
                 continue
 
-            except Exception as exc:
+            except Exception as e:
                 if msg is not None:
-                    await self._handle_failed_message(msg, exc)
+                    await self._handle_failed_message(msg, e)
                 else:
                     logger.exception("Exception occurred before a message was received.")
 
@@ -121,6 +122,7 @@ class KafkaConsumerService:
         # We are committing even if the DLT write fails to avoid a poison pill scenario where the same bad message is retried indefinitely, blocking the partition. This means that if the DLT write fails,
         # the message will be lost without backup, but it prevents the entire consumer from stalling. The
         # Losing one message is often better than stopping an entire stream. [Availability > One bad record]
+        # Have added more information in the Readme about the Poison Pill
         try:
             await self._consumer.commit()
         except Exception:
