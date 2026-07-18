@@ -2,13 +2,59 @@ import logging
 import os
 
 
-def setup_logger():
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        force=True # Force the logging configuration to be applied even if handlers are already present. This ensures that our logging configuration takes precedence and is applied regardless of any previous configurations made by other libraries.
+PROJECT_LOGGERS = (
+    "config",
+    "consumers",
+    "data_collectors",
+    "messaging",
+    "storage",
+    "utils",
+)
+
+THIRD_PARTY_LOGGERS = (
+    "aiokafka",
+    "asyncio",
+    "asyncpg",
+    "fyers_apiv3",
+    "urllib3",
+    "websockets",
+)
+
+
+def _get_log_level(env_var: str, default: str) -> int:
+    level_name = os.getenv(env_var, default).upper()
+    level = getattr(logging, level_name, None)
+    if isinstance(level, int):
+        return level
+
+    fallback = getattr(logging, default.upper(), logging.INFO)
+    logging.getLogger(__name__).warning(
+        "Invalid log level %r for %s. Falling back to %s.",
+        level_name,
+        env_var,
+        default.upper(),
     )
+    return fallback
+
+
+def setup_logger():
+    app_log_level = _get_log_level("LOG_LEVEL", "INFO")
+    third_party_log_level = _get_log_level("THIRD_PARTY_LOG_LEVEL", "WARNING")
+    kafka_log_level = _get_log_level("KAFKA_LOG_LEVEL", "WARNING")
+
+    logging.basicConfig(
+        level=third_party_log_level,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        force=True
+    )
+
+    for logger_name in PROJECT_LOGGERS:
+        logging.getLogger(logger_name).setLevel(app_log_level)
+
+    for logger_name in THIRD_PARTY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(third_party_log_level)
+
+    logging.getLogger("aiokafka").setLevel(kafka_log_level)
 
 
 
