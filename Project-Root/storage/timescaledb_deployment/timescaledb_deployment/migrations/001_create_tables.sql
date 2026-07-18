@@ -30,7 +30,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS raw_trades_dedup_idx
 CREATE TABLE IF NOT EXISTS candles (
     symbol       TEXT            NOT NULL,
     resolution   TEXT            NOT NULL,   -- '1m','5m','15m','1h'
-    open_time    TIMESTAMPTZ     NOT NULL,
+    open_time    TIMESTAMPTZ NOT NULL,
     open         NUMERIC(12, 4),
     high         NUMERIC(12, 4),
     low          NUMERIC(12, 4),
@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS candles (
     volume       BIGINT,
     trade_count  INTEGER,
     vwap         NUMERIC(12, 4),
+    is_partial   BOOLEAN,        -- true if the candle is still being built
+    close_time   TIMESTAMPTZ,
     PRIMARY KEY (symbol, resolution, open_time)
 );
 SELECT create_hypertable('candles', 'open_time');
