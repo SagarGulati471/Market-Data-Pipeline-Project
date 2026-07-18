@@ -4,8 +4,8 @@ import asyncpg
 import asyncio
 from datetime import timedelta, datetime, timezone
 from aiokafka import AIOKafkaProducer
-from normalizer.models import Trade
-from .models import Candle
+# from ..normalizer.models import Trade
+from .models import Candle, NormalizedTrade
 from config.config import Config
 from messaging.kafka_service.service import send_message
 
@@ -30,15 +30,16 @@ def make_handler(pool, producer):
        
         raw = msg.value.decode("utf-8")
         try:
+           logger.debug(f"Received raw message: {raw}")
            payload = json.loads(raw)
-           trade = Trade(**payload)
+           trade = NormalizedTrade(**payload)
         except Exception as e:
            logger.exception(f"Failed to parse message: {e} raw={raw}")
            return
        
         # Extract the time bucket for this trade (e.g. 12:00:00, 12:01:00, etc.)
         # We are rounding down the trade time to the nearest minute to create 1-minute candles.
-        bucket_time = trade.trade_time.replace(second=0, microsecond=0)
+        bucket_time = datetime.fromtimestamp(trade.timestamp / 1000, tz=timezone.utc).replace(second=0, microsecond=0)
         
         # Extract the trade symbol and price for easier access
         symbol = trade.symbol
@@ -62,6 +63,8 @@ def make_handler(pool, producer):
             BUCKET_TS[symbol] = {}
         if bucket_time not in BUCKET_TS[symbol]:
             BUCKET_TS[symbol][bucket_time] = {
+                'symbol': symbol,
+                'resolution': '1m',
                 'open':   price,
                 'high':   price,
                 'low':    price,
@@ -70,12 +73,12 @@ def make_handler(pool, producer):
                 'trade_count': 1,
                 'vwap':   price * trade.quantity,  # Volume Weighted Average Price numerator
                 'is_partial': True,  # Indicates if the candle is still being built
-                'symbol': symbol,
-                'resolution': '1m',
                 'open_time': bucket_time,
                 'close_time': bucket_time + timedelta(minutes=1),
             }
         else:
+            candle['symbol'] = symbol
+            candle['resolution'] = '1m'
             candle = BUCKET_TS[symbol][bucket_time]
             candle['high'] = max(candle['high'], price)
             candle['low'] = min(candle['low'], price)
@@ -84,8 +87,6 @@ def make_handler(pool, producer):
             candle['trade_count'] += 1
             candle['vwap'] += price * trade.quantity  # Update VWAP numerator
             candle['is_partial'] = True  # Candle is still being built
-            candle['symbol'] = symbol
-            candle['resolution'] = '1m'
             candle['open_time'] = bucket_time
             candle['close_time'] = bucket_time + timedelta(minutes=1)  # Update close time to the end of the bucket
             # Note: Here, we don't touch the open price here as it should have been set when the bucket was first created.
@@ -116,12 +117,14 @@ async def sweep_old_candle(producer: AIOKafkaProducer, pool: asyncpg.Pool) -> No
         pool: The asyncpg pool instance for database operations.
     """
     while True:
+        logger.info(f"Sweeping old candles from in-memory bucket... \n\n {BUCKET_TS}")
         for symbol, buckets in list(BUCKET_TS.items()):
             for bucket_time, candle_data in list(buckets.items()):
                 if not candle_data['is_partial']:
                     continue # Skip partial candles; we only want to emit complete ones
                 candle_age = (datetime.now(timezone.utc) - bucket_time).total_seconds() 
                 if candle_age > (BUCKET_EXPIRY_SECONDS + GRACE_PERIOD_SECONDS):
+                    candle['is_partial'] = False  # Mark the candle as complete before emitting it
                     candle = emit_candle(candle_data)
                     
                     # Pushing the candle's info to kafka and ingesting in DB
@@ -180,10 +183,9 @@ async def _ingest_into_db(pool: asyncpg.Pool, candle: Candle) -> None:
     asyncpg maps Python list[str] → PostgreSQL TEXT[] natively.
     """
     INSERT_QUERY = """
-        INSERT INTO candles (symbol, resolution, open_time, open, high, low, close, volume, trade_count, vwap, is_partial)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        ON CONFLICT (symbol, open_time, resolution, volume) DO NOTHING
-        
+        INSERT INTO candles (symbol, resolution, open, high, low, close, volume, trade_count, vwap, is_partial, open_time, close_time)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (symbol, resolution, open_time) DO NOTHING
     """
     try:
         async with pool.acquire() as conn:
@@ -191,7 +193,6 @@ async def _ingest_into_db(pool: asyncpg.Pool, candle: Candle) -> None:
                     INSERT_QUERY,
                     candle.symbol,
                     candle.resolution,
-                    candle.open_time,
                     candle.open,
                     candle.high,
                     candle.low,
@@ -199,15 +200,17 @@ async def _ingest_into_db(pool: asyncpg.Pool, candle: Candle) -> None:
                     candle.volume,
                     candle.trade_count,
                     candle.vwap,
-                    candle.is_partial
+                    candle.is_partial,
+                    candle.open_time,
+                    candle.close_time,
             )
         logger.debug(
-            f"Trade persisted: symbol={candle.symbol} "
-            f"trade_time={candle.open_time.isoformat()}"
+            f"Candle persisted: symbol={candle.symbol} "
+            f"open_time={candle.open_time.isoformat()}"
         )
     except Exception:
         logger.exception(
-            f"Failed to persist trade to DB: "
-            f"symbol={candle.symbol} trade_time={candle.open_time.isoformat()}"
+            f"Failed to persist candle to DB: "
+            f"symbol={candle.symbol} open_time={candle.open_time.isoformat()}"
         )
         raise
