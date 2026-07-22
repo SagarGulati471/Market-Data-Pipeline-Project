@@ -77,9 +77,10 @@ def make_handler(pool, producer):
                 'close_time': bucket_time + timedelta(minutes=1),
             }
         else:
+            candle = BUCKET_TS[symbol][bucket_time]
             candle['symbol'] = symbol
             candle['resolution'] = '1m'
-            candle = BUCKET_TS[symbol][bucket_time]
+            candle['open'] = candle['open']  # Open price remains the same for the bucket
             candle['high'] = max(candle['high'], price)
             candle['low'] = min(candle['low'], price)
             candle['close'] = price # Update the close price to the latest trade price we have received
@@ -124,7 +125,7 @@ async def sweep_old_candle(producer: AIOKafkaProducer, pool: asyncpg.Pool) -> No
                     continue # Skip partial candles; we only want to emit complete ones
                 candle_age = (datetime.now(timezone.utc) - bucket_time).total_seconds() 
                 if candle_age > (BUCKET_EXPIRY_SECONDS + GRACE_PERIOD_SECONDS):
-                    candle['is_partial'] = False  # Mark the candle as complete before emitting it
+                    candle_data['is_partial'] = False  # Mark the candle as complete before emitting it
                     candle = emit_candle(candle_data)
                     
                     # Pushing the candle's info to kafka and ingesting in DB
