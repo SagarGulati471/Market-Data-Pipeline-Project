@@ -52,6 +52,34 @@ Close = the price of the last trade in the minute (chronologically latest)
 High = the maximum price (this one IS max)
 Low = the minimum price (this one IS min)
 
+Volume = the total number of shares traded during the 1-minute candle window.
+         It is the accumulation of `quantity` from every individual trade tick received within that bucket.
+         Example: if 6 ticks arrive with quantities [100, 80, 50, 120, 75, 57], volume = 482.
+         Note: because we use a sampled websocket feed (Finnhub free tier), this will always be
+         lower than the full-tape volume shown on TradingView, which aggregates every exchange venue.
+         [The full data can be available from Polygon API or Bloomberg].
+         Currently all the tests I have done on the data received by Finnhub's free tier API received.
+
+VWAP (per-candle) = the volume-weighted average price of all trades within the 1-minute candle.
+
+         Formula:
+             vwap = Σ(price_i × quantity_i) / Σ(quantity_i)
+
+         Implementation:
+             During accumulation we store the raw numerator:
+                 candle['vwap'] += price * trade.quantity   (running sum of price × qty)
+
+             At emit time (emit_candle) we finalize it:
+                 candle.vwap = candle['vwap'] / candle['volume']
+
+         This is a per-candle metric - it reflects the average execution price within that
+         single minute, weighted by trade size. It is NOT the session VWAP indicator shown
+         on TradingView, which is cumulative from market open and resets daily.
+
+         Session VWAP (for the indicator pipeline) can be derived from stored candles as:
+             session_vwap(t) = SUM(candle.vwap * candle.volume) / SUM(candle.volume)
+                               for all candles from session open up to time t
+
 
 
 # Understanding on GoRoutines
