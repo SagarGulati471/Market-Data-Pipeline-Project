@@ -29,12 +29,24 @@ class Config:
         self.FINNHUB_WEBSOCKET_URI= os.getenv("FINNHUB_WEBSOCKET_URI", f"wss://ws.finnhub.io?token={self.FINNHUB_API_TOKEN}").strip("'")
         self.FINNHUB_STOCK_SYMBOLS = os.getenv('FINNHUB_STOCK_SYMBOLS', 'BINANCE:BTCUSDT,OANDA:EUR_USD').strip("'").split(',')
         self.KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BROKER_URL', 'localhost:9093')
+
+        # TOPICS 
         self.FINNHUB_KAFKA_TOPIC = os.getenv('FINNHUB_KAFKA_TOPIC', 'market_data')
+
+        # NORMALIZER PIPELINE
         self.DEAD_LETTER_TOPIC_NORMALIZER = os.getenv('DEAD_LETTER_TOPIC_NORMALIZER', 'normalizer-dlt')
         self.KAFKA_TOPIC_NORMALIZED_TRADES = os.getenv('KAFKA_TOPIC_NORMALIZED_TRADES', 'trades-normalized')
+
+        # CANDLE BUILDER PIPELINE
         self.KAFKA_TOPIC_CANDLES = os.getenv('KAFKA_TOPIC_CANDLES', 'candles')
         self.DEAD_LETTER_TOPIC_CANDLE_BUILDER = os.getenv('DEAD_LETTER_TOPIC_CANDLE_BUILDER', 'candle-builder-dlt')
-        # TimescaleDB / PostgreSQL connection settings
+
+        # INDICATOR PIPELINE
+        self.KAFKA_TOPIC_INDICATOR = os.getenv('KAFKA_TOPIC_INDICATOR', 'candles')
+        self.DEAD_LETTER_TOPIC_INDICATOR = os.getenv('DEAD_LETTER_TOPIC_INDICATOR', 'indicator-dlt')
+
+
+       # TimescaleDB / PostgreSQL connection settings
         self.DB_HOST     = os.getenv('DB_HOST',     'localhost')
         self.DB_PORT     = os.getenv('DB_PORT',     '5432')
         self.DB_NAME     = os.getenv('DB_NAME',     'marketdata')
