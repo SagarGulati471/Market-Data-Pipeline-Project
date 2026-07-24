@@ -63,7 +63,7 @@ async def main():
             pass
         await close_pool()
 
-        logger.info("Normalizer shutdown complete.")
+        logger.info("Candle Builder Pipeline shutdown complete.")
     
 
 
