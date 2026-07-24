@@ -76,3 +76,45 @@ CREATE TABLE IF NOT EXISTS signals (
     metadata    JSONB                       -- extra context
 );
 SELECT create_hypertable('signals', 'timestamp');
+
+
+
+
+CREATE TABLE indicators (
+    symbol           TEXT            NOT NULL,
+    resolution       TEXT            NOT NULL,
+    open_time        TIMESTAMPTZ     NOT NULL,
+
+    -- Session VWAP (cumulative from market open, resets daily)
+    vwap_session     DOUBLE PRECISION,
+
+    -- Simple Moving Averages
+    sma_9            DOUBLE PRECISION,
+    sma_21           DOUBLE PRECISION,
+    sma_50           DOUBLE PRECISION,
+    sma_200          DOUBLE PRECISION,
+
+    -- Exponential Moving Averages
+    ema_9            DOUBLE PRECISION,
+    ema_21           DOUBLE PRECISION,
+    ema_50           DOUBLE PRECISION,
+    ema_200          DOUBLE PRECISION,
+
+    -- RSI
+    rsi_14           DOUBLE PRECISION,
+
+    -- MACD (fast=12, slow=26, signal=9)
+    macd_line        DOUBLE PRECISION,   -- EMA(12) - EMA(26)
+    macd_signal      DOUBLE PRECISION,   -- EMA(9) of macd_line
+    macd_histogram   DOUBLE PRECISION,   -- macd_line - macd_signal
+
+    -- Bollinger Bands (period=20, std_dev=2)
+    bb_upper         DOUBLE PRECISION,   -- SMA(20) + 2*stddev
+    bb_middle        DOUBLE PRECISION,   -- SMA(20)
+    bb_lower         DOUBLE PRECISION,   -- SMA(20) - 2*stddev
+    bb_bandwidth     DOUBLE PRECISION,   -- (upper - lower) / middle
+
+    PRIMARY KEY (symbol, resolution, open_time)
+);
+
+SELECT create_hypertable('indicators', 'open_time');
