@@ -43,6 +43,8 @@ class Indicator(BaseModel):
 
     # Relative Strength Index
     rsi_14: float | None = Field(default=None, alias="rsi_14")
+    rsi_avg_gain_14: float | None = Field(default=None, alias="rsi_avg_gain_14")
+    rsi_avg_loss_14: float | None = Field(default=None, alias="rsi_avg_loss_14")
 
     # Moving Average Convergence Divergence
     macd_line: float | None = Field(default=None, alias="macd_line")

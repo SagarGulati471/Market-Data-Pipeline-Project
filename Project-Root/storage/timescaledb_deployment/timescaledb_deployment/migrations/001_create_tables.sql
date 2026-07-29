@@ -102,6 +102,8 @@ CREATE TABLE indicators (
 
     -- RSI
     rsi_14           DOUBLE PRECISION,
+    rsi_avg_gain_14    DOUBLE PRECISION,
+    rsi_avg_loss_14    DOUBLE PRECISION,
 
     -- MACD (fast=12, slow=26, signal=9)
     macd_line        DOUBLE PRECISION,   -- EMA(12) - EMA(26)
