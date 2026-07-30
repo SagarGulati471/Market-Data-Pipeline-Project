@@ -1,7 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
 import datetime
-
 
 
 
@@ -38,8 +36,8 @@ class Indicator(BaseModel):
     # Exponential Moving Averages
     ema_9: float | None = Field(default=None, alias="ema_9")
     ema_12: float | None = Field(default=None, alias="ema_12")
-    ema_26: float | None = Field(default=None, alias="ema_26")  
     ema_21: float | None = Field(default=None, alias="ema_21")
+    ema_26: float | None = Field(default=None, alias="ema_26")  
     ema_50: float | None = Field(default=None, alias="ema_50")
     ema_200: float | None = Field(default=None, alias="ema_200")
 

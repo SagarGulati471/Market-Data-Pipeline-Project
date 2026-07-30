@@ -45,25 +45,6 @@ CREATE TABLE IF NOT EXISTS candles (
 SELECT create_hypertable('candles', 'open_time');
 
 
-CREATE TABLE IF NOT EXISTS indicators (
-    symbol      TEXT            NOT NULL,
-    resolution  TEXT            NOT NULL,
-    timestamp   TIMESTAMPTZ     NOT NULL,
-    ema_9       NUMERIC(12, 4),
-    ema_21      NUMERIC(12, 4),
-    ema_50      NUMERIC(12, 4),
-    rsi_14      NUMERIC(6, 2),
-    macd        NUMERIC(12, 4),
-    macd_signal NUMERIC(12, 4),
-    macd_hist   NUMERIC(12, 4),
-    bb_upper    NUMERIC(12, 4),
-    bb_middle   NUMERIC(12, 4),
-    bb_lower    NUMERIC(12, 4),
-    vwap        NUMERIC(12, 4),
-    atr_14      NUMERIC(12, 4),
-    PRIMARY KEY (symbol, resolution, timestamp)
-);
-SELECT create_hypertable('indicators', 'timestamp');
 
 
 CREATE TABLE IF NOT EXISTS signals (
@@ -80,7 +61,7 @@ SELECT create_hypertable('signals', 'timestamp');
 
 
 
-CREATE TABLE indicators (
+CREATE TABLE IF NOT EXISTS indicators (
     symbol           TEXT            NOT NULL,
     resolution       TEXT            NOT NULL,
     open_time        TIMESTAMPTZ     NOT NULL,

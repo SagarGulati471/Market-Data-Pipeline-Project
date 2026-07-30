@@ -37,8 +37,10 @@ def make_handler(pool, producer):
 
         # Compute indicators for the candle
         indicator = await compute_indicators(pool, candle)
-        await ingest_into_db(pool, indicator)
-        await produce_indicator(producer, indicator)
+        await asyncio.gather(
+            ingest_into_db(pool, indicator),
+            produce_indicator(producer, indicator)
+        )
     
     return handle_message
 
@@ -51,31 +53,22 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
     you want to compute (e.g., SMA, EMA, RSI, MACD, Bollinger Bands, etc.).
     """
 
+    # fetch_candle_from_db:
     # Fetching historical candles from the database for the same symbol and resolution
     # Fetching the last 200 candles for the same symbol and resolution to compute indicators
     # Selecting 200 because 200 is the max number of candles needed to compute the 200-period SMA/EMA, 
     # hence in single query we can fetch all the required candles for all indicators.
     # Returns a list of Candle objects sorted by open_time in descending order (most recent first).
+
+    # fetch_indicators_from_db:
+    # Fetching the last computed indicators from the database for the same symbol and resolution
     
-    historical_candles = await fetch_candle_from_db(
-        pool,
-        candle.symbol,
-        candle.resolution,
-        candle.open_time,
-        200
+    historical_candles, historical_indicators = await asyncio.gather(
+            fetch_candle_from_db(pool, candle.symbol, candle.resolution, candle.open_time, 200),
+            fetch_indicators_from_db(pool, candle.symbol, candle.resolution, candle.open_time, 1),
     )
-    candle_closes = [candle.close] + [c.close for c in historical_candles]
-
-    # Fetching historical indicators from the database for the same symbol, resolution, and timestamp
-    # Fetching the last indicator for the same symbol and resolution to compute EMA
-    historical_indicators = await fetch_indicators_from_db(
-        pool,
-        candle.symbol,
-        candle.resolution,
-        candle.open_time,
-        1
-    )
-
+    
+    candle_closes = [candle.close] + [c.close for c in historical_candles]    
     closes_oldest_first=None
 
     # 1.) ******************** Small Moving Averages (SMA) Calculations ********************
@@ -186,8 +179,6 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         if closes_oldest_first is None:
             closes_oldest_first = list(reversed(candle_closes))
 
-        # Compute the MACD series for the last 34 closes (26 + 9 - 1) to have enough data points to compute the 9-period EMA of the MACD line.
-        # Note: We need at least 34 closes to compute the MACD signal line because the MACD line is based on the 12 and 26 period EMAs, and we need an additional 9 periods to compute the EMA of the MACD line.
         macd_series = compute_macd(closes_oldest_first)
         macd_signal = compute_ema(macd_series, 9) if len(macd_series) >= 9 else None
     
@@ -206,7 +197,9 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         sma_50 =            sma_50,
         sma_200 =           sma_200,
         ema_9 =             ema_9,
+        ema_12 =            ema_12,
         ema_21 =            ema_21,
+        ema_26 =            ema_26,
         ema_50  =           ema_50,
         ema_200 =           ema_200,
         rsi_14=rsi_14,
@@ -385,8 +378,8 @@ async def fetch_indicators_from_db(pool, symbol, resolution, timestamp, max_cand
             return None
         except Exception as e:
             logger.exception(f"Database query failed:{e}, Query={DB_QUERY}, parameters=({symbol}, {resolution}, {timestamp}, {max_candles_to_fetch})")
-            return None
-            
+            raise
+
 
 
 # Async function to fetch a candle from the database
@@ -439,8 +432,15 @@ async def fetch_candle_from_db(pool, symbol, resolution, timestamp, max_candles_
                return [Candle(**dict(row)) for row in result]
             return []
         except Exception as e:
+            # → DB fails
+            # → exception logged
+            # → raise propagates to compute_indicators
+            # → propagates to handle_message (no catch there)
+            # → base consumer catches it → routes original Kafka message to DLT
+            # → when DB recovers, DLT replays the message correctly
+
             logger.exception(f"Database query failed:{e}, Query={DB_QUERY}, parameters=({symbol}, {resolution}, {timestamp}, {max_candles_to_fetch})")
-            return []
+            raise
 
 
 async def ingest_into_db(pool: asyncpg.Pool, indicator: Indicator) -> None:
