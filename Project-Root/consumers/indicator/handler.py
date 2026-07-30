@@ -254,6 +254,8 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         bb_lower=           bb_lower,
         bb_bandwidth=       bb_bandwidth
     )
+
+    logger.debug(f"\n\n Computed indicators for symbol={candle.symbol} open_time={candle.open_time.isoformat()}: {indicator}")
     return indicator
      
 
@@ -414,7 +416,7 @@ async def fetch_indicators_from_db(pool, symbol, resolution, timestamp, max_cand
             )
             if result:
                 logger.debug(f"Fetched {len(result)} Candle's indicator records from DB for symbol={symbol}, resolution={resolution}, timestamp<{timestamp}")
-                logger.debug(f"Fetched indicators: {result}")
+                logger.debug(f"Fetched indicators: {result} \n\n")
                 return Indicator(**dict(result))
             return None
         except Exception as e:
@@ -468,7 +470,7 @@ async def fetch_candle_from_db(pool, symbol, resolution, timestamp, max_candles_
                 max_candles_to_fetch
             )
             logger.debug(f"Fetched {len(result)} candles from DB for symbol={symbol}, resolution={resolution}, timestamp<{timestamp}")
-            logger.debug(f"Fetched candles: {result}")
+            logger.debug(f"Fetched candles: {result} \n\n")
             if result:
                return [Candle(**dict(row)) for row in result]
             return []
@@ -552,7 +554,7 @@ async def produce_indicator(producer: AIOKafkaProducer, indicator: Indicator) ->
     symbol are routed to the same partition, preserving per-symbol message ordering
     for the downstream consumers.
     """
-    topic = config.KAFKA_TOPIC_INDICATOR
+    topic = config.KAFKA_TOPIC_SIGNAL
     try:
         await send_message(
             producer,
