@@ -6,6 +6,7 @@
 
 
 
+------------------------------------------------------------------------------------------------------
 ## EMA - Exponential Moving Average
 
 The Exponential Moving Average (EMA) is a refined moving average (MA) that emphasizes recent data points more heavily, offering a crucial edge in tracking price dynamics. Unlike the Simple Moving Average (SMA), which distributes weight equally across data points, the EMA’s technique gives it a distinct advantage in responding swiftly to price fluctuations.
@@ -62,9 +63,32 @@ More sensitivity to short-term movements
 1.) EMA of Tth day depends on the EMA of (T-1)th day
 2.) The latest price is given higher weightage, and the older prices are given lower weightage. In other words, the older the period, the smaller α → recent prices dominate less → EMA moves slower.
 
+### Note:
+Also, EMA is never perfectly accurate from the moment it's seeded. When you first compute EMA(26) at candle 26, it is literally just an SMA no smoothing has happened at all. The more candles you feed into it after that seed, the more the initial SMA seed gets "forgotten" and the EMA converges toward what it should truly be.
+Eg: if wehave lets say 14 candles and we are calculating EMa-12 then it might not be that accurate bcz the seed is the avg of first 12 candles. and then we start calculating the EMa which is very near, hence not much smoothing has happenned.
+Its better to take 200 candles, so we keep smoothing the EMa and then for the last 12 candles calculate the EMA
+
+### Think it this way
+With 34 candles passed to compute_macd:
+  EMA(26) gets only 8 more updates after seeding → still heavily influenced by the SMA seed
+  MACD series has only 9 values (barely warmed up)
+  Signal EMA(9) seeds on those 9 values, no further recursion → just SMA of 9 bad MACD values
+
+With 200 candles passed:
+  EMA(26) gets 174 more updates after seeding → initial SMA seed nearly forgotten
+  MACD series has ~175 values (properly warmed up)
+  Signal EMA(9) seeds on first 9, then recurses for ~166 more → accurate
+
+This is the reason in the compute_ema function, even though we have to calculate ema12, we pass the whole list of candles "closes_oldest_first", so we get to do enough smoothing
 
 
 
+
+So one thing again to clarify and where my confusion is whenever we have calculate ema x , we pass a certain number of candle closes (closing prices), the first x prices will be seeded as SMA and then we will start calculating from the next set of prices and keep smoothing it , and whatever will be the last value that will be our EMA_x
+
+Pass N closes → seed with SMA of first N → recursively smooth through the rest → last value is your EMA.
+
+------------------------------------------------------------------------------------------------------
 
 ## RSI - Relative Strength Indicator
 
@@ -90,6 +114,7 @@ RSI[17] = 100 - 100/(1 + avg_gain[2]/avg_loss[2])
 
 ## RSI - Deep Dive (How it actually works and how we implemented it)
 
+Document from where I understood RSI: https://blog.quantinsti.com/rsi-indicator/
 
 ### What is RSI?
 
@@ -275,3 +300,225 @@ A: No. RSI alone is not enough to do the next incremental update. Wilder smoothi
 **Q: In the incremental path, where does prev_close come from?**
 A: From `closes_oldest_first[-2]`. The list contains the current candle's close at the end (index -1) and the previous candle's close second-to-last (index -2). The previous candle's close comes from the historical candles fetched from the DB.
 
+
+
+------------------------------------------------------------------------------------------------------
+# MACD (Moving Average Convergence Divergence)
+
+Can refer to this for understanding - https://www.alpharithms.com/python-iterables-072512/#google_vignette
+
+Most of the explanation and understanding I had was from the AI.
+Below is the AI-written documentation and recaptulation of all our discussions.
+
+## What is MACD trying to tell you?
+
+MACD is basically trying to answer this question: is the short-term price trend moving away from (diverging) or coming back toward (converging) the long-term trend?
+
+When the short-term average is running ahead of the long-term average, it means price has been rising fast recently — momentum is building. When the two averages start coming back together, momentum is fading. The name literally says this — Moving Average Convergence Divergence.
+
+It doesn't care about the raw price directly. It cares about the relationship between a fast EMA and a slow EMA.
+
+
+## The three outputs of MACD
+
+MACD gives you three numbers, not one:
+
+
+### 1. MACD Line
+
+```
+MACD Line = EMA(12) - EMA(26)
+```
+
+EMA(12) is the short-term (fast) trend. EMA(26) is the long-term (slow) trend. The difference between them is the MACD Line.
+
+- Positive → short-term is above long-term → price has been going up → bullish
+- Negative → short-term is below long-term → price has been going down → bearish
+- Bigger the number (positive or negative), stronger the momentum
+
+
+### 2. Signal Line
+
+```
+Signal Line = EMA(9) of the MACD Line values (not of the closing prices)
+```
+
+This is where it gets a bit different. The Signal Line is not an EMA of prices — it's an EMA of the MACD Line values themselves. So you're smoothing the momentum.
+
+This is used to generate actual trade signals. When the MACD Line crosses the Signal Line, that's a buy or sell signal.
+
+
+### 3. Histogram
+
+```
+Histogram = MACD Line - Signal Line
+```
+
+This is just the gap between the MACD Line and Signal Line. When it's growing, momentum is accelerating. When it's shrinking toward zero, momentum is fading — might be a reversal coming.
+
+
+## What is the "zero line" / "zero crossing"?
+
+I had confusion here — there are actually two places where zero matters:
+
+**Zero line of the MACD Line itself:**
+When MACD Line = 0, it means EMA(12) = EMA(26). The short-term and long-term are perfectly aligned. When MACD Line crosses zero from below (goes from negative to positive), it means the fast EMA just crossed above the slow EMA — a bullish signal, but a slow one. Most traders prefer the MACD/Signal crossover instead because it's faster.
+
+**Zero line of the Histogram:**
+Histogram = 0 when MACD Line = Signal Line. So histogram crossing zero is the same event as MACD Line crossing Signal Line. When histogram goes from negative to positive, MACD crossed above Signal — bullish.
+
+There is no separate "distance from zero line" calculation. The MACD Line value itself IS that distance. If MACD Line = 2.5, you're 2.5 above zero. That's it.
+
+
+## Trading signals to watch for
+
+```
+MACD Line crosses above Signal Line  →  Bullish (potential buy)
+MACD Line crosses below Signal Line  →  Bearish (potential sell)
+
+MACD Line crosses above 0            →  Trend turned bullish (slower, weaker signal)
+MACD Line crosses below 0            →  Trend turned bearish (slower, weaker signal)
+
+Histogram growing                    →  Momentum strengthening
+Histogram shrinking toward 0         →  Momentum fading, possible reversal
+```
+
+
+## Why EMA(12) and EMA(26) specifically?
+
+Historical defaults from Gerald Appel who invented MACD in the late 1970s. Back then US markets traded 6 days a week. EMA(12) ≈ 2 trading weeks, EMA(26) ≈ 1 trading month. These stuck as the universal standard.
+
+
+## How does compute_ema work — my understanding
+
+When you call `compute_ema(closes_oldest_first, N)`:
+- The first N closing prices are seeded as a plain SMA (just a simple average)
+- From candle N+1 onwards, you start applying the EMA formula: `alpha * new_price + (1 - alpha) * previous_ema`
+where alpha is 2/(N + 1) where N is the period of EMA,
+eg: for EMA_12 the period is 12 (or we call it 12 period EMA)
+- You keep doing this for every remaining price
+- Whatever the last value is when the loop ends — that is your EMA_N
+
+So the more prices you pass to it beyond N, the more smoothing steps happen, and the more accurate the EMA gets. That's why we pass 200 candles even though technically EMA(26) only needs 26 to produce its first value.
+
+
+## Why we need EMA(12) and EMA(26) stored in the DB
+
+For the incremental path of MACD, we need EMA(12) and EMA(26) of the previous candle. These were already being computed and stored as part of our regular EMA section (ema_12 and ema_26 fields). So MACD gets those for free — no extra DB query needed.
+
+We also need to store macd_signal (the Signal Line value) so that the next candle can do an incremental update of it.
+
+
+## Why does Signal Line need 34 candles minimum (not just 26)?
+
+I had confusion here. EMA(26) needs 26 candles to produce its first value. But Signal Line = EMA(9) of the MACD Line values. To seed that EMA(9), you need at least 9 MACD Line values.
+
+The first MACD Line value appears at candle 26. Each candle after that gives you one more. So to get 9 MACD Line values:
+
+```
+Candle 26  → MACD value #1
+Candle 27  → MACD value #2
+...
+Candle 34  → MACD value #9
+```
+
+So you need 34 candles minimum just to get the first Signal Line value. The formula is: 26 + (9 - 1) = 34. The -1 is because candle 26 already gives you MACD #1 for free, so you only need 8 more candles after that.
+
+But in our pipeline we pass 200 candles, so this minimum is never a concern. We use all 200 to get a properly warmed-up Signal Line.
+
+
+## Why passing only 34 candles is wrong (my original mistake)
+
+I originally tried passing only the last 34 closes to `compute_macd`. The problem is that EMA(26) seeded on those 34 closes would use the SMA of the last 26 closes as its starting point. But those last 26 closes are not candles 1-26 — they're recent candles with specific recent prices. The EMA hasn't been properly "warmed up" through history. You get the right structure but wrong numbers.
+
+The correct approach is to pass the full 200 closes so EMA(26) gets seeded properly at candle 26 and then updated 174 more times before producing the final MACD value.
+
+
+Under EMA I have added why this smoothing is important
+
+## The compute_macd function — what it does step by step
+
+This was a key confusion: I was calling compute_ema in a loop for each candle, which reseeds from scratch every time and gives you SMA not EMA. The correct approach is to maintain running state:
+
+```
+1. Seed ema_12 = SMA of closes[0:12]
+2. Roll ema_12 forward through closes[12:26]  ← 14 more updates, gets ema_12 to candle 26
+3. Seed ema_26 = SMA of closes[0:26]
+4. Both EMAs are now at the same candle (index 25, the 26th candle)
+5. Capture first MACD = ema_12 - ema_26       ← don't skip this step!
+6. Walk through closes[26:] updating both EMAs at each step, appending ema_12 - ema_26
+7. Return the full macd_series list
+```
+
+Step 5 is easy to miss. If you start the loop at index 26 without capturing the first MACD at index 25, you lose one data point. The fix is one line before the loop:
+```python
+macd_series = [ema_12 - ema_26]   # first MACD value at candle 26
+```
+
+Step 6 is critical — you must update both EMAs with the same price in the same iteration. If you call compute_ema from scratch in the loop instead, you're reseeding EMA every time and computing SMA, not EMA.
+
+
+## The two paths in our implementation
+
+
+### Incremental path (most candles — fast, O(1))
+
+When `historical_indicators.macd_signal` exists in the DB:
+
+```
+alpha = 2 / (9 + 1)  = 0.2
+macd_line   = ema_12 - ema_26              ← already computed in the EMA section above
+macd_signal = 0.2 * macd_line + 0.8 * historical_indicators.macd_signal
+macd_histogram = macd_line - macd_signal
+```
+
+No history needed beyond what's already computed. The stored macd_signal carries all the memory of past smoothing.
+
+
+### Cold start path (first time, full recompute)
+
+When no prior macd_signal in DB:
+
+```
+1. closes_oldest_first = reversed(candle_closes)  ← full 200 candles
+2. macd_series = compute_macd(closes_oldest_first) ← rolling EMA(12), EMA(26), produces ~175 MACD values
+3. macd_signal = compute_ema(macd_series, 9)       ← EMA(9) of those MACD values
+4. macd_histogram = macd_line - macd_signal
+```
+
+After cold start, the next candle uses the incremental path forever.
+
+
+## Full pipeline flow
+
+```
+New candle arrives
+        ↓
+EMA section already computed ema_12 and ema_26 for current candle
+        ↓
+macd_line = ema_12 - ema_26  (or None if not enough history)
+        ↓
+Does historical_indicators.macd_signal exist?
+        ↓
+   YES → Incremental                    NO → Cold start
+   alpha * macd_line +                  compute_macd(closes_oldest_first)
+   (1-alpha) * prev_signal              → macd_series (~175 values)
+                                        compute_ema(macd_series, 9)
+        ↓                                       ↓
+   macd_signal                   ←      macd_signal
+        ↓
+macd_histogram = macd_line - macd_signal
+        ↓
+Store in indicators table: macd_line, macd_signal, macd_histogram
+```
+
+
+## What we store in the DB and why
+
+```
+macd_line      → stored for downstream consumers (signals, charts)
+macd_signal    → MUST store — needed for incremental EMA(9) update next candle
+macd_histogram → derived but stored for convenience
+ema_12         → MUST store — needed for incremental MACD line update next candle
+ema_26         → MUST store — needed for incremental MACD line update next candle
+```

@@ -103,6 +103,23 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         ema_9 = compute_ema(closes_oldest_first, 9)
 
 
+    alpha = 2 / (12 + 1)
+    if historical_indicators and historical_indicators.ema_12 is not None:
+        ema_12 = (candle.close * alpha) + (historical_indicators.ema_12 * (1 - alpha))
+    else:
+        if not closes_oldest_first:
+            closes_oldest_first = list(reversed(candle_closes))
+        ema_12 = compute_ema(closes_oldest_first, 12)
+
+    alpha = 2 / (26 + 1)
+    if historical_indicators and historical_indicators.ema_26 is not None:
+        ema_26 = (candle.close * alpha) + (historical_indicators.ema_26 * (1 - alpha))
+    else:
+        if not closes_oldest_first:
+            closes_oldest_first = list(reversed(candle_closes))
+        ema_26 = compute_ema(closes_oldest_first, 26)
+
+
     # Calculating EMA_21
     alpha = 2 / (21 + 1)
     if historical_indicators and historical_indicators.ema_21 is not None:
@@ -147,6 +164,38 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
     else:
         rsi_avg_gain_14, rsi_avg_loss_14, rsi_14 = compute_rsi(closes_oldest_first, 14) if len(candle_closes) >= 16 else (None, None, None)
 
+    
+    # 4.) ******************** Moving Average Convergence Divergence (MACD) Calculations ********************
+    # MACD is calculated by subtracting the 26-period EMA from the 12-period EMA. The signal line is a 9-period EMA of the MACD line.
+    # MACD = EMA_12 - EMA_26
+    # Signal Line = EMA_9 of MACD
+    # MACD Histogram = MACD - Signal Line
+
+    macd_line = None
+    macd_signal = None
+    macd_histogram = None
+
+    if ema_12 is not None and ema_26 is not None:
+        macd_line = ema_12 - ema_26
+
+    if historical_indicators and historical_indicators.macd_signal is not None and macd_line is not None:
+        alpha = 2/(9 + 1)
+        macd_signal = alpha * macd_line + (1 - alpha) * historical_indicators.macd_signal
+    else:
+        # Cold start, we need to compute the MACD signal line from the historical MACD values.
+        if closes_oldest_first is None:
+            closes_oldest_first = list(reversed(candle_closes))
+
+        # Compute the MACD series for the last 34 closes (26 + 9 - 1) to have enough data points to compute the 9-period EMA of the MACD line.
+        # Note: We need at least 34 closes to compute the MACD signal line because the MACD line is based on the 12 and 26 period EMAs, and we need an additional 9 periods to compute the EMA of the MACD line.
+        macd_series = compute_macd(closes_oldest_first)
+        macd_signal = compute_ema(macd_series, 9) if len(macd_series) >= 9 else None
+    
+    macd_histogram = macd_line - macd_signal if macd_line is not None and macd_signal is not None else None
+
+
+
+
     indicator = Indicator(
         symbol=candle.symbol,
         resolution=candle.resolution,
@@ -163,16 +212,58 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         rsi_14=rsi_14,
         rsi_avg_gain_14=rsi_avg_gain_14,
         rsi_avg_loss_14=rsi_avg_loss_14,
-        macd_line=0.0,     # Placeholder
-        macd_signal=0.0,   # Placeholder
-        macd_histogram=0.0,# Placeholder
+        macd_line=macd_line,
+        macd_signal=macd_signal,
+        macd_histogram=macd_histogram,
         bb_upper=0.0,      # Placeholder (To be implemented later)
-        bb_middle=0.0,     # Placeholder
-        bb_lower=0.0,      # Placeholder
-        bb_bandwidth=0.0   # Placeholder
+        bb_middle=0.0,     # Placeholder (To be implemented later)
+        bb_lower=0.0,      # Placeholder (To be implemented later)
+        bb_bandwidth=0.0   # Placeholder (To be implemented later)
     )
     return indicator
      
+
+
+def compute_macd(closes_oldest_first: list[float]) -> list[float]:
+    # Computing the EMA for 12 and 26 periods to calculate the MACD line
+
+    
+    if len(closes_oldest_first) < 26:
+        return []
+
+    macd_series = []
+    alpha_12 = 2/(12 + 1)
+    alpha_26 = 2/(26 + 1)
+
+    # Seed EMA(12) from the first 12 closes
+    ema_12 = sum(closes_oldest_first[:12]) / 12
+
+    # Rolling this ema_12 forward for the next 14 closes to get the EMA(12) for the 26th close, 
+    # so we can compute the MACD line for the 26th close. 
+    for price in closes_oldest_first[12:26]:
+        ema_12 = alpha_12 * price + (1 - alpha_12) * ema_12
+
+    # Seed EMA(26) from the first 26 closes
+    ema_26 = sum(closes_oldest_first[:26]) / 26
+
+    # Now we have both EMA(12) and EMA(26) for the 26th close, we can compute the MACD line for the 26th close.
+    # Even if we don't add this to the macd series, we will still be computing the correct MACD line from the 27th close onwards,
+    # just adding it for more warm up (smoothing).
+    macd_series.append(ema_12 - ema_26)
+
+    # Both EMAs are now at the same candle (index 25). 
+    # we wil start computing the MACD line from the index 26 onwards, that will be 27th close
+    for price in closes_oldest_first[26:]:
+        ema_12 = alpha_12 * price + (1 - alpha_12) * ema_12
+        ema_26 = alpha_26 * price + (1 - alpha_26) * ema_26
+        macd_line = ema_12 - ema_26
+
+        # Store or process the macd_line as needed
+        macd_series.append(macd_line)
+    return macd_series
+    
+    
+
 
 
 # Wilder's RSI calculation method is used here, which is a smoothed version of the original RSI calculation.
@@ -238,32 +329,6 @@ def compute_rsi(closes_oldest_first: list[float], period: int) -> list[float | N
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return avg_gain, avg_loss, rsi
-
-
-# The function below computes the average gains and losses for the previous candles, which is used in the RSI calculation.
-# The avg gain and loss for the first period are simple averages, and subsequent averages are smoothed using the previous average gain and loss.
-# So it is a recursive calculation, where the previous average gain and loss are used to calculate the current average gain and loss.
-# def compute_average_gains_and_losses_for_prev_candles(closes_oldest_first: list[float], period: int, gains: list[float], losses: list[float]) -> tuple[float, float] | tuple[None, None]:
-
-#     if len(closes_oldest_first) < period:
-#         logger.debug(f"There are not enough {period} candles, hence skipping calculating average gains")
-#         return None, None
-
-
-#     # This avg_gain and avg_loss is for the first period, subsequent gains will be calculated using the previous average gain and the current gain.
-#     avg_gain = sum(gains[:period]) / period
-#     avg_loss = sum(losses[:period]) / period
-
-#     for idx in range(1, len(closes_oldest_first) - 1):
-#         avg_gain = (avg_gain * (period - 1) + gains[idx])/period
-#         # print(f"avg_gain after idx {idx}: {avg_gain}")
-
-#     for idx in range(1, len(closes_oldest_first) - 1):
-#         avg_loss = (avg_loss * (period - 1) + losses[idx])/period
-
-#     return avg_gain, avg_loss
-    
-
 
 
 def compute_ema(closes_oldest_first: list[float], period: int) -> float | None:
@@ -384,8 +449,8 @@ async def ingest_into_db(pool: asyncpg.Pool, indicator: Indicator) -> None:
         """
 
         INSERT_QUERY="""      
-        INSERT INTO indicators (symbol, resolution, open_time, vwap_session, sma_9, sma_21, sma_50, sma_200, ema_9, ema_21, ema_50, ema_200, rsi_14, rsi_avg_gain_14, rsi_avg_loss_14, macd_line, macd_signal, macd_histogram, bb_upper, bb_middle, bb_lower, bb_bandwidth)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        INSERT INTO indicators (symbol, resolution, open_time, vwap_session, sma_9, sma_21, sma_50, sma_200, ema_9, ema_12, ema_26, ema_21, ema_50, ema_200, rsi_14, rsi_avg_gain_14, rsi_avg_loss_14, macd_line, macd_signal, macd_histogram, bb_upper, bb_middle, bb_lower, bb_bandwidth)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
         ON CONFLICT (symbol,resolution,open_time) DO NOTHING
         """
         try:
@@ -401,6 +466,8 @@ async def ingest_into_db(pool: asyncpg.Pool, indicator: Indicator) -> None:
                       indicator.sma_50,
                       indicator.sma_200,
                       indicator.ema_9,
+                      indicator.ema_12,
+                      indicator.ema_26,
                       indicator.ema_21,
                       indicator.ema_50,
                       indicator.ema_200,

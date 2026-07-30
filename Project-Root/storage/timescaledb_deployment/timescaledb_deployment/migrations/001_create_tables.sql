@@ -96,6 +96,8 @@ CREATE TABLE indicators (
 
     -- Exponential Moving Averages
     ema_9            DOUBLE PRECISION,
+    ema_12           DOUBLE PRECISION,
+    ema_26           DOUBLE PRECISION,
     ema_21           DOUBLE PRECISION,
     ema_50           DOUBLE PRECISION,
     ema_200          DOUBLE PRECISION,
