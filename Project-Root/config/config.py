@@ -42,8 +42,12 @@ class Config:
         self.DEAD_LETTER_TOPIC_CANDLE_BUILDER = os.getenv('DEAD_LETTER_TOPIC_CANDLE_BUILDER', 'candle-builder-dlt')
 
         # INDICATOR PIPELINE
-        self.KAFKA_TOPIC_INDICATOR = os.getenv('KAFKA_TOPIC_INDICATOR', 'candles')
+        self.KAFKA_TOPIC_INDICATOR = os.getenv('KAFKA_TOPIC_INDICATOR', 'indicators')
         self.DEAD_LETTER_TOPIC_INDICATOR = os.getenv('DEAD_LETTER_TOPIC_INDICATOR', 'indicator-dlt')
+
+        # SIGNAL GENERATOR PIPELINE
+        self.KAFKA_TOPIC_SIGNAL = os.getenv('KAFKA_TOPIC_SIGNAL', 'signals')
+        self.DEAD_LETTER_TOPIC_SIGNAL = os.getenv('DEAD_LETTER_TOPIC_SIGNAL', 'signal-dlt')
 
 
        # TimescaleDB / PostgreSQL connection settings
