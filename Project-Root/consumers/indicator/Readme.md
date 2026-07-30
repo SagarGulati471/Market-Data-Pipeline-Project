@@ -95,3 +95,6 @@ Compute layer  (same indicator functions, called on-demand)
 Return [{open_time, value}]  →  render on chart
 ```
 
+
+
+
