@@ -522,3 +522,134 @@ macd_histogram → derived but stored for convenience
 ema_12         → MUST store — needed for incremental MACD line update next candle
 ema_26         → MUST store — needed for incremental MACD line update next candle
 ```
+
+
+------------------------------------------------------------------------------------------------------
+# Bollinger Bands
+
+
+## What are Bollinger Bands?
+
+Bollinger Bands are a volatility indicator invented by John Bollinger in the 1980s. While RSI tells you momentum and MACD tells you trend direction, Bollinger Bands tell you how much the price is moving around its average — basically, is the market calm or wild right now?
+
+Visually they look like an envelope around the price chart — a middle line (the average price) with an upper and lower boundary that breathes in and out depending on how volatile the market is. When price is calm, the bands are tight. When price is moving a lot, the bands widen.
+
+
+## The three outputs
+
+**Middle Band** = SMA(20) of the last 20 closes. This is just a plain 20-period simple average. Nothing fancy. Same as SMA_20.
+
+**Upper Band** = Middle Band + (2 × standard deviation of the last 20 closes)
+
+**Lower Band** = Middle Band − (2 × standard deviation of the last 20 closes)
+
+**Bandwidth** = (Upper − Lower) / Middle — tells you how wide the bands are relative to the price level. A small bandwidth means the market is very calm. A large bandwidth means it's volatile.
+
+
+## What is standard deviation here?
+
+Standard deviation measures how spread out the last 20 closes are from their average. If all 20 closes were the exact same price, std_dev = 0 and the bands collapse to a single line. If prices are jumping around a lot, std_dev is large and the bands are wide.
+
+The formula:
+```
+mean     = sum(last 20 closes) / 20    ← this is bb_middle
+
+variance = sum( (each_close - mean)² ) / 20
+
+std_dev  = sqrt(variance)
+
+bb_upper = mean + 2 * std_dev
+bb_lower = mean - 2 * std_dev
+```
+
+Why divide by N (not N-1)? There are two types of standard deviation — population (÷N) and sample (÷N-1). Bollinger Bands specifically use population standard deviation (÷N). This is not a mistake. John Bollinger deliberately chose this. We do the same.
+
+
+## Why 2 standard deviations?
+
+In a normal distribution, 95% of values fall within ±2 standard deviations of the mean. So when price touches the upper or lower band, it's statistically "unusual" — it happens only about 5% of the time under normal market conditions. That's what makes it a meaningful signal.
+
+
+## What the signals mean
+
+```
+Price touches or breaks the UPPER band  →  Overbought, or a strong upside breakout
+Price touches or breaks the LOWER band  →  Oversold, or a strong downside breakdown
+Bands are very NARROW (squeeze)         →  Volatility is extremely low — a big move
+                                            is coming soon (direction unknown)
+Bands are very WIDE                     →  High volatility, market is already moving hard
+Price bouncing between upper and lower  →  No clear trend, just ranging sideways
+```
+
+The squeeze is one of the most useful signals. When bands squeeze tight (bandwidth very small), it means calm has lasted too long. Traders watch for the first candle that breaks out strongly after a squeeze to determine direction.
+
+
+## Why period 20?
+
+John Bollinger's original default. On daily charts, 20 trading days ≈ 1 calendar month. Same reasoning as EMA(26) for MACD. These defaults became universal standards.
+
+
+## The key difference from RSI and MACD — no stored state needed
+
+RSI stores avg_gain and avg_loss in the DB because each candle's RSI builds on the previous one (Wilder smoothing is recursive). MACD stores macd_signal because each signal update builds on the previous one.
+
+Bollinger Bands are NOT recursive. Every candle's BB depends only on the last 20 closes in a sliding window. Drop the oldest, add the newest, recalculate from scratch. There is no memory of prior candles beyond the window.
+
+So:
+- No incremental path
+- No cold start path
+- No DB state to store
+- Just pick the last 20 closes and compute every time
+
+This makes BB the simplest of all the indicators to implement.
+
+
+## Implementation
+
+```python
+def compute_bollinger_bands(closes_newest_first, period=20):
+    if len(closes_newest_first) < period:
+        return None, None, None, None
+
+    window = closes_newest_first[:period]       # last 20 closes
+    mean = sum(window) / period                 # bb_middle = SMA(20)
+    variance = sum((p - mean) ** 2 for p in window) / period   # population variance
+    std_dev = variance ** 0.5
+
+    upper = mean + 2 * std_dev
+    lower = mean - 2 * std_dev
+    bandwidth = (upper - lower) / mean if mean != 0 else None
+
+    return upper, mean, lower, bandwidth
+```
+
+In our pipeline we don't have a separate `compute_bollinger_bands` function — the logic is written inline in `compute_indicators` using `closes_oldest_first[-20:]` (same 20 closes, just oldest-to-newest order, which doesn't matter for mean and std_dev since both are order-independent).
+
+
+## What we store in the DB
+
+```
+bb_upper     → stored for downstream (signals, charts)
+bb_middle    → stored (= SMA_20, useful reference)
+bb_lower     → stored for downstream
+bb_bandwidth → stored (useful for squeeze detection)
+```
+
+Nothing needs to be stored for the next candle's computation. Each candle computes all four values from scratch using the current 200-candle fetch, no extra DB reads needed.
+
+
+## Full pipeline flow
+
+```
+New candle arrives
+        ↓
+candle_closes already has last 200 closes (newest first)
+        ↓
+closes_oldest_first[-20:] = last 20 closes in oldest-to-newest order
+        ↓
+len >= 20? 
+   NO  → bb_upper, bb_middle, bb_lower, bb_bandwidth = None
+   YES → compute mean, std_dev, upper, lower, bandwidth
+        ↓
+Store in indicators table: bb_upper, bb_middle, bb_lower, bb_bandwidth
+```

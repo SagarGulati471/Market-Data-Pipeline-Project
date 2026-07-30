@@ -33,7 +33,7 @@ def make_handler(pool, producer):
             logger.debug(f"Parsed candle: {candle}")
         except Exception as e:
             logger.exception(f"Failed to parse message: {e} raw={raw}")
-            return
+            raise e
 
         # Compute indicators for the candle
         indicator = await compute_indicators(pool, candle)
@@ -71,14 +71,15 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
     candle_closes = [candle.close] + [c.close for c in historical_candles]    
     closes_oldest_first=None
 
-    # 1.) ******************** Small Moving Averages (SMA) Calculations ********************
+    # 1.) ************************** Small Moving Averages (SMA) Calculations **************************
     sma_9 = sum(candle_closes[:9]) / 9 if len(candle_closes) >= 9 else None
     sma_21 = sum(candle_closes[:21]) / 21 if len(candle_closes) >= 21 else None
     sma_50 = sum(candle_closes[:50]) / 50 if len(candle_closes) >= 50 else None
     sma_200 = sum(candle_closes[:200]) / 200 if len(candle_closes) >= 200 else None
 
 
-    # 2.) ******************** Exponential Moving Averages (EMA) Calculations ********************
+
+    # 2.) ************************** Exponential Moving Averages (EMA) Calculations **************************
 
     # Formula for EMA = α * (Current Price) + (1 - α) * (Previous EMA)
     # where α = 2 / (N + 1), and N is the number of periods (e.g., 9, 21, 50, 200).
@@ -143,7 +144,8 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         ema_200 = compute_ema(closes_oldest_first, 200)
 
 
-    # 3.) ******************** Relative Strength Index (RSI) Calculations ********************
+
+    # 3.) ************************** Relative Strength Index (RSI) Calculations **************************
     if closes_oldest_first is None:
         closes_oldest_first = list(reversed(candle_closes))
 
@@ -157,8 +159,9 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
     else:
         rsi_avg_gain_14, rsi_avg_loss_14, rsi_14 = compute_rsi(closes_oldest_first, 14) if len(candle_closes) >= 16 else (None, None, None)
 
+
     
-    # 4.) ******************** Moving Average Convergence Divergence (MACD) Calculations ********************
+    # 4.) ************************** Moving Average Convergence Divergence (MACD) Calculations **************************
     # MACD is calculated by subtracting the 26-period EMA from the 12-period EMA. The signal line is a 9-period EMA of the MACD line.
     # MACD = EMA_12 - EMA_26
     # Signal Line = EMA_9 of MACD
@@ -186,12 +189,21 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
 
 
 
+    # 5.) ************************** Bollinger Bands (BB) Calculations **************************
+    if closes_oldest_first is None:
+        closes_oldest_first = list(reversed(candle_closes))
+    mean = sum(closes_oldest_first[-20:]) / 20 if len(closes_oldest_first) >= 20 else None
+    std_dev = (sum((x - mean) ** 2 for x in closes_oldest_first[-20:]) / 20) ** 0.5 if mean is not None else None
+    bb_upper = mean + 2 * std_dev if mean is not None and std_dev is not None else None
+    bb_middle = mean
+    bb_lower = mean - 2 * std_dev if mean is not None and std_dev is not None else None
+    bb_bandwidth = (bb_upper - bb_lower) / bb_middle if bb_upper is not None and bb_lower is not None and bb_middle else None
 
     indicator = Indicator(
         symbol=candle.symbol,
         resolution=candle.resolution,
         open_time=candle.open_time,
-        vwap_session=0.0,  # Placeholder
+        vwap_session=None,  # Placeholder (to be implemented)
         sma_9 =             sma_9,
         sma_21 =            sma_21,
         sma_50 =            sma_50,
@@ -208,10 +220,10 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         macd_line=macd_line,
         macd_signal=macd_signal,
         macd_histogram=macd_histogram,
-        bb_upper=0.0,      # Placeholder (To be implemented later)
-        bb_middle=0.0,     # Placeholder (To be implemented later)
-        bb_lower=0.0,      # Placeholder (To be implemented later)
-        bb_bandwidth=0.0   # Placeholder (To be implemented later)
+        bb_upper=bb_upper,
+        bb_middle=bb_middle,
+        bb_lower=bb_lower,
+        bb_bandwidth=bb_bandwidth
     )
     return indicator
      
@@ -348,8 +360,8 @@ def compute_ema(closes_oldest_first: list[float], period: int) -> float | None:
 # Fetch indicators from the database for a given symbol, resolution, and timestamp
 async def fetch_indicators_from_db(pool, symbol, resolution, timestamp, max_candles_to_fetch = 1):
     """
-    Fetch a candle from the database based on the provided symbol, resolution, and timestamp.
-    Returns a Candle object if found, otherwise returns None.
+    Fetch an indicator from the database based on the provided symbol, resolution, and timestamp.
+    Returns an Indicator object if found, otherwise returns None.
     """
     async with pool.acquire() as connection:
 
