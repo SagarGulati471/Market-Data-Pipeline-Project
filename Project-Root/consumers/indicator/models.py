@@ -25,7 +25,9 @@ class Indicator(BaseModel):
     open_time:  datetime.datetime
 
     # Indicator fields
-    vwap_session: float | None = Field(default=None, alias='vwap_session')
+    vwap_session:      float | None = Field(default=None, alias='vwap_session')
+    vwap_numerator:    float | None = Field(default=None, alias='vwap_numerator')
+    vwap_denominator:  float | None = Field(default=None, alias='vwap_denominator')
 
     # Simple Moving Averages
     sma_9: float | None = Field(default=None, alias="sma_9")

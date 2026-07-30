@@ -199,31 +199,60 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
     bb_lower = mean - 2 * std_dev if mean is not None and std_dev is not None else None
     bb_bandwidth = (bb_upper - bb_lower) / bb_middle if bb_upper is not None and bb_lower is not None and bb_middle else None
 
+
+
+    # 6.) ************************** VWAP Session (VWAP) Calculations **************************
+    # Formula for VWAP = (Cumulative (Price * Volume)) / (Cumulative Volume)
+    # VWAP = Σ(price × volume) / Σ(volume)
+    is_new_session = (
+        historical_indicators is None or
+        historical_indicators.open_time.date() != candle.open_time.date() or
+        historical_indicators.vwap_numerator is None   # handles rows stored before VWAP was implemented
+        # We are checking only numerator because if numerator is None, then denominator will also be None, hence we don't need to check for denominator.
+    )
+    if is_new_session:
+        # First candle of today, it will start fresh
+        new_numerator   = candle.vwap * candle.volume
+        new_denominator = candle.volume
+    else:
+        # its a candle of the same day, just accumulate
+        # The candle.vwap is (price * volume) / volume)
+        # however for Session VWAP numerator we need cummulative (Price * Volume) since there we have divided by volume now here we are multiplying by volume,
+        # we're undoing the division that happened in the candle builder to get back to the raw dollar-volume. 
+        # Hence we get back the numerator of (Price * Volume) for this candle.
+        new_numerator   = historical_indicators.vwap_numerator   + (candle.vwap * candle.volume)
+        new_denominator = historical_indicators.vwap_denominator + candle.volume
+
+    vwap_session = new_numerator / new_denominator if new_denominator > 0 else None
+
+
     indicator = Indicator(
-        symbol=candle.symbol,
-        resolution=candle.resolution,
-        open_time=candle.open_time,
-        vwap_session=None,  # Placeholder (to be implemented)
-        sma_9 =             sma_9,
-        sma_21 =            sma_21,
-        sma_50 =            sma_50,
-        sma_200 =           sma_200,
-        ema_9 =             ema_9,
-        ema_12 =            ema_12,
-        ema_21 =            ema_21,
-        ema_26 =            ema_26,
-        ema_50  =           ema_50,
-        ema_200 =           ema_200,
-        rsi_14=rsi_14,
-        rsi_avg_gain_14=rsi_avg_gain_14,
-        rsi_avg_loss_14=rsi_avg_loss_14,
-        macd_line=macd_line,
-        macd_signal=macd_signal,
-        macd_histogram=macd_histogram,
-        bb_upper=bb_upper,
-        bb_middle=bb_middle,
-        bb_lower=bb_lower,
-        bb_bandwidth=bb_bandwidth
+        symbol=             candle.symbol,
+        resolution=         candle.resolution,
+        open_time=          candle.open_time,
+        vwap_session=       vwap_session,
+        vwap_numerator=     new_numerator,
+        vwap_denominator=   new_denominator,
+        sma_9=              sma_9,
+        sma_21=             sma_21,
+        sma_50=             sma_50,
+        sma_200=            sma_200,
+        ema_9=              ema_9,
+        ema_12=             ema_12,
+        ema_21=             ema_21,
+        ema_26=             ema_26,
+        ema_50=             ema_50,
+        ema_200=            ema_200,
+        rsi_14=             rsi_14,
+        rsi_avg_gain_14=    rsi_avg_gain_14,
+        rsi_avg_loss_14=    rsi_avg_loss_14,
+        macd_line=          macd_line,
+        macd_signal=        macd_signal,
+        macd_histogram=     macd_histogram,
+        bb_upper=           bb_upper,
+        bb_middle=          bb_middle,
+        bb_lower=           bb_lower,
+        bb_bandwidth=       bb_bandwidth
     )
     return indicator
      
@@ -461,8 +490,8 @@ async def ingest_into_db(pool: asyncpg.Pool, indicator: Indicator) -> None:
         """
 
         INSERT_QUERY="""      
-        INSERT INTO indicators (symbol, resolution, open_time, vwap_session, sma_9, sma_21, sma_50, sma_200, ema_9, ema_12, ema_26, ema_21, ema_50, ema_200, rsi_14, rsi_avg_gain_14, rsi_avg_loss_14, macd_line, macd_signal, macd_histogram, bb_upper, bb_middle, bb_lower, bb_bandwidth)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+        INSERT INTO indicators (symbol, resolution, open_time, vwap_session, vwap_numerator, vwap_denominator, sma_9, sma_21, sma_50, sma_200, ema_9, ema_12, ema_26, ema_21, ema_50, ema_200, rsi_14, rsi_avg_gain_14, rsi_avg_loss_14, macd_line, macd_signal, macd_histogram, bb_upper, bb_middle, bb_lower, bb_bandwidth)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
         ON CONFLICT (symbol,resolution,open_time) DO NOTHING
         """
         try:
@@ -473,6 +502,8 @@ async def ingest_into_db(pool: asyncpg.Pool, indicator: Indicator) -> None:
                       indicator.resolution,
                       indicator.open_time,
                       indicator.vwap_session,
+                      indicator.vwap_numerator,
+                      indicator.vwap_denominator,
                       indicator.sma_9,
                       indicator.sma_21,
                       indicator.sma_50,

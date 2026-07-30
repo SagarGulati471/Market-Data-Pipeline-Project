@@ -653,3 +653,141 @@ len >= 20?
         ↓
 Store in indicators table: bb_upper, bb_middle, bb_lower, bb_bandwidth
 ```
+
+
+------------------------------------------------------------------------------------------------------
+# VWAP — Volume Weighted Average Price
+
+
+## Two types of VWAP in this pipeline
+
+Before getting into session VWAP, worth noting that we actually have two flavours of VWAP in this pipeline and they live in different places:
+
+**Per-candle VWAP** — already implemented in the candle builder pipeline. For every 1-minute candle, VWAP = Σ(price × qty) / Σ(qty) across all the individual trades that happened within that candle. This tells you the average price weighted by trade size for just that one minute. It is stored as `candle.vwap` in the candles table.
+
+**Session VWAP** — implemented here in the indicator pipeline. This accumulates from the market open all the way to the current candle. It resets every day. This is what traders actually watch on charts — a running line from 9:30 AM that shows the volume-weighted average price for the entire day so far.
+
+
+## What is session VWAP and why does it matter?
+
+Session VWAP is the most widely used intraday indicator by institutional traders and market makers. It tells you: at what average price has the entire day's volume been executed so far?
+
+It's used as a reference point:
+- Price above VWAP → buyers in control, bullish intraday sentiment
+- Price below VWAP → sellers in control, bearish intraday sentiment
+- Many algorithms use VWAP as a benchmark — "buy below VWAP, sell above VWAP"
+- Institutional orders are often executed using VWAP as the target price
+
+
+## The formula
+
+```
+Session VWAP = Σ(price × volume) / Σ(volume)  — from market open to current candle
+```
+
+At the end of the day if you had:
+- 1000 shares traded at $50 (morning)
+- 500 shares traded at $55 (afternoon)
+
+Session VWAP = (1000×50 + 500×55) / (1000+500) = (50000 + 27500) / 1500 = $51.67
+
+The morning trades dominate because more volume happened there.
+
+
+## Why is candle.vwap × candle.volume needed (my confusion)
+
+I initially thought `candle.vwap` was already price × volume so multiplying by volume again seemed wrong. 
+
+Here's the actual breakdown:
+
+`candle.vwap` is the result of `(price × qty) / qty` — it's a price, like $51.33. The candle builder already divided by volume when computing per-candle VWAP.
+
+To compute session VWAP correctly, we need Σ(price × qty) across all candles. But we only have the divided result `candle.vwap`. So we multiply back:
+
+```
+candle.vwap × candle.volume 
+= (Σ price×qty / Σ qty) × Σ qty 
+= Σ(price×qty) for that candle   ← the raw dollar-volume we need
+```
+
+This "undoes" the division that already happened in the candle builder. Then we sum these across all candles and divide by total volume to get session VWAP.
+
+If you just summed candle.vwap values and divided by the count of candles, you'd get a simple average of the per-minute VWAPs. That gives equal weight to a candle with 10 shares and a candle with 10,000 shares — completely wrong.
+
+
+## Why we can't just use the 200 historical candles fetch
+
+A US equities session runs from 9:30 AM to 4:00 PM — that's 390 minutes = 390 one-minute candles. We only fetch the last 200 candles for indicator computation. By mid-afternoon, more than 200 candles have passed since market open, and the 200-candle fetch won't cover the full session. Session VWAP computed only from the last 200 candles would be wrong.
+
+This is the same problem RSI has (it needs all history to be accurate). The solution is the same pattern — store the running state in the DB.
+
+
+## The incremental approach — same pattern as RSI
+
+Store two internal fields in the indicators table:
+- `vwap_numerator` = Σ(price × volume) from session open to this candle
+- `vwap_denominator` = Σ(volume) from session open to this candle
+
+Each new candle adds its contribution to both:
+```
+new_numerator   = prev_numerator + (candle.vwap × candle.volume)
+new_denominator = prev_denominator + candle.volume
+vwap_session    = new_numerator / new_denominator
+```
+
+O(1) per candle. No need to fetch historical candles at all for VWAP.
+
+
+## Session detection — how do we know it's a new day?
+
+My first instinct was to hardcode `session_start = 9:30 AM` and check if the candle's open_time equals that. This is broken because:
+- Finnhub's sampled feed often delivers the first candle at 9:31 or 9:32 (a minute or two late is normal)
+- If the first candle is at 9:31, `candle.open_time (9:31) > session_start (9:30)` → the check misses it → we'd try to accumulate on top of yesterday's numerator → entire day's VWAP is wrong
+
+The correct approach is to compare dates, not times:
+
+```python
+is_new_session = (
+    historical_indicators is None or
+    historical_indicators.open_time.date() != candle.open_time.date() or
+    historical_indicators.vwap_numerator is None   # handles old DB rows before VWAP was added
+)
+```
+
+- `historical_indicators is None` → no prior row, definitely a new session
+- `.date() != .date()` → previous indicator was from a different day → reset
+- `vwap_numerator is None` → old rows in DB from before VWAP was implemented → reset instead of crashing
+
+This handles late first candles, market holidays, weekends, and DB migration all automatically. No hardcoded times.
+
+
+## Full pipeline flow
+
+```
+New candle arrives
+        ↓
+Check: is this a new session?
+  historical_indicators is None  OR
+  previous indicator was a different date  OR
+  previous vwap_numerator is None
+        ↓
+   YES (new session)              NO (same day)
+   reset:                         accumulate:
+   numerator  = vwap × volume     numerator  = prev_numerator + vwap × volume
+   denominator = volume           denominator = prev_denominator + volume
+        ↓
+vwap_session = numerator / denominator
+        ↓
+Store: vwap_session, vwap_numerator, vwap_denominator
+```
+
+
+## What we store in the DB and why
+
+```
+vwap_session     → the actual VWAP value (for downstream consumers / charts)
+vwap_numerator   → MUST store — running Σ(price×volume), needed for incremental update
+vwap_denominator → MUST store — running Σ(volume), needed for incremental update
+```
+
+`vwap_numerator` and `vwap_denominator` are internal state — not meaningful to downstream consumers on their own, just like `rsi_avg_gain_14` and `rsi_avg_loss_14`. They are the memory that lets us do O(1) updates without re-reading history.

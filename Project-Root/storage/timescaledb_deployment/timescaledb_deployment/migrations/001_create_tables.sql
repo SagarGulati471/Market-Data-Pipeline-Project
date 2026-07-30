@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS indicators (
 
     -- Session VWAP (cumulative from market open, resets daily)
     vwap_session     DOUBLE PRECISION,
+    vwap_numerator   DOUBLE PRECISION,
+    vwap_denominator DOUBLE PRECISION,
 
     -- Simple Moving Averages
     sma_9            DOUBLE PRECISION,
