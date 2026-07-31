@@ -14,3 +14,4 @@ Data_collector/kafka/kafka_data/
 
 Project-Root/messaging/kafka/data/*
 Project-Root/storage/timescaledb-deployment/timescaledb-deployment/timescale-data/*
+Project-Root/consumers/signal_generator/architecture_discussions_with_ai.md
