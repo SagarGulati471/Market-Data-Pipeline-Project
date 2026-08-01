@@ -230,6 +230,7 @@ async def compute_indicators(pool, candle: Candle) -> Indicator:
         symbol=             candle.symbol,
         resolution=         candle.resolution,
         open_time=          candle.open_time,
+        close_price=        candle.close,
         vwap_session=       vwap_session,
         vwap_numerator=     new_numerator,
         vwap_denominator=   new_denominator,
@@ -492,8 +493,8 @@ async def ingest_into_db(pool: asyncpg.Pool, indicator: Indicator) -> None:
         """
 
         INSERT_QUERY="""      
-        INSERT INTO indicators (symbol, resolution, open_time, vwap_session, vwap_numerator, vwap_denominator, sma_9, sma_21, sma_50, sma_200, ema_9, ema_12, ema_26, ema_21, ema_50, ema_200, rsi_14, rsi_avg_gain_14, rsi_avg_loss_14, macd_line, macd_signal, macd_histogram, bb_upper, bb_middle, bb_lower, bb_bandwidth)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+        INSERT INTO indicators (symbol, resolution, open_time, close_price, vwap_session, vwap_numerator, vwap_denominator, sma_9, sma_21, sma_50, sma_200, ema_9, ema_12, ema_26, ema_21, ema_50, ema_200, rsi_14, rsi_avg_gain_14, rsi_avg_loss_14, macd_line, macd_signal, macd_histogram, bb_upper, bb_middle, bb_lower, bb_bandwidth)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
         ON CONFLICT (symbol,resolution,open_time) DO NOTHING
         """
         try:
@@ -503,6 +504,7 @@ async def ingest_into_db(pool: asyncpg.Pool, indicator: Indicator) -> None:
                       indicator.symbol,
                       indicator.resolution,
                       indicator.open_time,
+                      indicator.close_price,
                       indicator.vwap_session,
                       indicator.vwap_numerator,
                       indicator.vwap_denominator,

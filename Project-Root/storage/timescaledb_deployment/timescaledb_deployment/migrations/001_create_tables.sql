@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS indicators (
     symbol           TEXT            NOT NULL,
     resolution       TEXT            NOT NULL,
     open_time        TIMESTAMPTZ     NOT NULL,
+    close_price      DOUBLE PRECISION,
 
     -- Session VWAP (cumulative from market open, resets daily)
     vwap_session     DOUBLE PRECISION,
