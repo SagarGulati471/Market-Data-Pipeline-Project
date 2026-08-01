@@ -23,6 +23,7 @@ class Indicator(BaseModel):
     symbol: str
     resolution: str
     open_time:  datetime.datetime
+    close_price: float | None = Field(default=None, alias='close_price')
 
     # Indicator fields
     vwap_session:      float | None = Field(default=None, alias='vwap_session')
