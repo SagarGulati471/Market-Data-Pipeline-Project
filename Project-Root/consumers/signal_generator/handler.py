@@ -5,13 +5,32 @@ import asyncio
 from aiokafka import AIOKafkaProducer
 
 from config.config import Config
-from .models import Signal
+from .models import Signal, SignalType, StrategySignal
 from ..indicator.models import Indicator
+from .strategies.strategy_EMA_crossover import check as EMA_crossover_check
+from .strategies.strategy_MACD_crossover import check as MACD_crossover_check
+from .strategies.strategy_RSI_reversal import check as RSI_reversal_check
+from .strategies.strategy_VWAP_confluence import check as VWAP_confluence_check
 from messaging.kafka_service.service import send_message
+
 
 config = Config()
 logger = logging.getLogger(__name__)
 
+
+# currently we have 4 strategies, each with equal weight of 0.25. This can be adjusted based on the importance of each strategy.
+STRATEGY_CONFIG = [
+    ("strategy_EMA_crossover",   EMA_crossover_check,   0.25),
+    ("strategy_RSI_reversal",    RSI_reversal_check,    0.25),
+    ("strategy_MACD_crossover",  MACD_crossover_check,  0.25),
+    ("strategy_VWAP_confluence", VWAP_confluence_check, 0.25),
+]
+
+THRESHOLD_BUY          =  0.50
+THRESHOLD_STRONG_BUY   =  0.75
+THRESHOLD_SELL         = -0.50
+THRESHOLD_STRONG_SELL  = -0.75
+THRESHOLD_HOLD         =  0.0  # This is the lower bound for HOLD. Anything between -0.50 and 0.50 is considered HOLD.
 
 def make_handler(pool, producer):
     
@@ -33,7 +52,7 @@ def make_handler(pool, producer):
 
         # Process the indicator data (e.g., generate signals)
         # Signal will always be either of BUY, SELL, HOLD. 
-        signal = await generate_signal(indicator, prev_indicator)
+        signal = generate_signal(indicator, prev_indicator)
 
         await asyncio.gather(
             ingest_into_db(pool, signal),
@@ -61,9 +80,48 @@ def generate_signal(indicator, prev_indicator):
     In this function we will be calculating the signals based on the current and previous indicator values.
     We will calling different strategies to generate signals and then combine them to generate a final signal.
     """
-    pass
-     
-    
+
+    weighted_signal = 0.0
+    strategy_results = {}
+    for strategy_name, strategy_func, weight in STRATEGY_CONFIG:
+        logger.debug(f"Running {strategy_name} for symbol={indicator.symbol} open_time={indicator.open_time}")
+        signal = strategy_func(indicator, prev_indicator)
+        if signal == StrategySignal.BUY:
+            weighted_signal += weight
+        elif signal == StrategySignal.SELL:
+            weighted_signal -= weight
+        strategy_results[strategy_name] = signal
+        logger.debug(f"{strategy_name} signal: {signal}")
+
+    # Determine the final signal based on the weighted score
+    if weighted_signal > THRESHOLD_STRONG_BUY:
+        final_signal = SignalType.STRONG_BUY
+        threshold = THRESHOLD_STRONG_BUY
+    elif weighted_signal > THRESHOLD_BUY:
+        final_signal = SignalType.BUY
+        threshold = THRESHOLD_BUY
+    elif weighted_signal < THRESHOLD_STRONG_SELL:
+        final_signal = SignalType.STRONG_SELL
+        threshold = THRESHOLD_STRONG_SELL
+    elif weighted_signal < THRESHOLD_SELL:
+        final_signal = SignalType.SELL
+        threshold = THRESHOLD_SELL
+    else:
+        final_signal = SignalType.HOLD
+        threshold = THRESHOLD_HOLD
+
+    return Signal(
+        symbol=indicator.symbol,
+        resolution=indicator.resolution,
+        open_time=indicator.open_time,  
+        signal_type=final_signal,
+        strategy_EMA_crossover=strategy_results['strategy_EMA_crossover'],
+        strategy_RSI_reversal=strategy_results['strategy_RSI_reversal'],
+        strategy_MACD_crossover=strategy_results['strategy_MACD_crossover'],
+        strategy_VWAP_confluence=strategy_results['strategy_VWAP_confluence'],
+        weighted_score=weighted_signal,
+        threshold=threshold,
+    )
 
 
 
@@ -100,8 +158,6 @@ async def fetch_indicators_from_db(pool, symbol, resolution, timestamp, max_cand
         except Exception as e:
             logger.exception(f"Database query failed:{e}, Query={DB_QUERY}, parameters=({symbol}, {resolution}, {timestamp}, {max_candles_to_fetch})")
             raise
-
-
 
 
 async def ingest_into_db(pool: asyncpg.Pool, signal: Signal) -> None:
