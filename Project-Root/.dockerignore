@@ -1,0 +1,12 @@
+myvenv/
+venv_3.14/
+.git/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+Project-visuals/
+data/
+docker/
+migrations/
