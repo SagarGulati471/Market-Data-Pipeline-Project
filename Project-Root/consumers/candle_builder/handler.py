@@ -35,7 +35,7 @@ def make_handler(pool, producer):
            trade = NormalizedTrade(**payload)
         except Exception as e:
            logger.exception(f"Failed to parse message: {e} raw={raw}")
-           return
+           raise e # Raising the exception to let the consumer know that this message failed processing and should be sent to the dead letter topic.
        
         # Extract the time bucket for this trade (e.g. 12:00:00, 12:01:00, etc.)
         # We are rounding down the trade time to the nearest minute to create 1-minute candles.
