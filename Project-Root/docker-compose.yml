@@ -5,6 +5,9 @@ x-common-env: &common-env
   DB_NAME: ${DB_NAME}
   DB_USER: ${DB_USER}
   DB_PASSWORD: ${DB_PASSWORD}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  THIRD_PARTY_LOG_LEVEL: ${THIRD_PARTY_LOG_LEVEL:-WARNING}
+  KAFKA_LOG_LEVEL: ${KAFKA_LOG_LEVEL:-WARNING}
 
 
 
@@ -21,11 +24,12 @@ services:
       FINNHUB_WEBSOCKET_URI: ${FINNHUB_WEBSOCKET_URI}
       FINNHUB_STOCK_SYMBOLS: ${FINNHUB_STOCK_SYMBOLS}
       FINNHUB_KAFKA_TOPIC: ${FINNHUB_KAFKA_TOPIC}
+      # LOG_LEVEL: ${LOG_LEVEL:-INFO} # We can override the log level for this service if needed, but it's already set in the common-env.
     entrypoint: ["python", "-m", "data_collectors.Finnhub.websocket"]
     networks:
       - app-network
     depends_on:
-      kafka:
+      kafka:  
         condition: service_healthy  # Ensures that the data_collector service waits for the Kafka service to be healthy before starting. These services takes some time to start up, so this ensures that the data_collector service doesn't attempt to connect to Kafka before it's ready.
       timescale:
         condition: service_healthy
@@ -126,8 +130,6 @@ services:
       - "9092:9092" # This is what you'll use from host / Python / aiokafka
       - "29093:29093"
       - "9093:9093"
-    # profiles:
-    #     - infrastructure_containers
     environment:
       KAFKA_NODE_ID: 1 # Unique broker ID
       KAFKA_PROCESS_ROLES: broker,controller # Broker (handles data), Controller (handles metadata)
@@ -155,7 +157,8 @@ services:
       retries: 10
       start_period: 30s
     volumes:
-      - ./data:/var/lib/kafka/data # Where logs are stored
+      # - ./data:/var/lib/kafka/data # Where logs are stored
+        - kafka-data:/var/lib/kafka/data # Defining named volume for Kafka data persistence 
 
 
 
@@ -183,8 +186,6 @@ services:
     # image: timescale/timescaledb:latest-pg16
     image: timescale/timescaledb:2.27.1-pg16
     container_name: timescale
-    # profiles:
-    #     - infrastructure_containers
     environment:
     - POSTGRES_USER=${DB_USER}
     - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -193,7 +194,7 @@ services:
     - "5432:5432"
     volumes:
     - timescale-data:/var/lib/postgresql/data # Defining named volume
-    - ./migrations:/docker-entrypoint-initdb.d
+    - ./storage/timescaledb_deployment/migrations:/docker-entrypoint-initdb.d
     networks:
       - infra-network
       - app-network
@@ -229,11 +230,11 @@ services:
 
 volumes:
   timescale-data:
+  kafka-data:
 
 networks:
   infra-network:
     driver: bridge
-    
   app-network:
     driver: bridge
 

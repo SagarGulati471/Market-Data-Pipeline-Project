@@ -11,17 +11,14 @@ logger = logging.getLogger(__name__)
 # Function to create and return an aiokafka producer instance
 async def create_kafka_producer():
     config = Config()
-    # bootstrap_servers='127.0.0.1:9092'
-    bootstrap_servers='localhost:9093'
     producer = AIOKafkaProducer(
-        # bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
-        bootstrap_servers=bootstrap_servers
+        bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
         # security_protocol=config.KAFKA_SECURITY_PROTOCOL,
         # sasl_mechanism=config.KAFKA_SASL_MECHANISM,
         # sasl_plain_username=config.KAFKA_SASL_USERNAME,
         # sasl_plain_password=config.KAFKA_SASL_PASSWORD,
     )
-    logger.info(f"producer starting at bootstrap_servers = {bootstrap_servers}")
+    logger.info(f"producer starting at bootstrap_servers = {config.KAFKA_BOOTSTRAP_SERVERS}")
     await producer.start()
     logger.info("Kafka producer created and started successfully.")
     return producer
@@ -66,6 +63,7 @@ async def shutdown_kafka_producer(producer):
         logger.info("Kafka producer stopped successfully.")
     except Exception as e:
         logger.error(f"Failed to stop Kafka producer: {e}")
+        
 
 
 # Function to create a topic if it doesn't exist (optional, depending on your Kafka setup)

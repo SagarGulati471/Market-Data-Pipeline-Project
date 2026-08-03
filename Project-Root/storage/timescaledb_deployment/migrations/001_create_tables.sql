@@ -46,21 +46,6 @@ SELECT create_hypertable('candles', 'open_time');
 
 
 
-
-CREATE TABLE IF NOT EXISTS signals (
-    symbol      TEXT            NOT NULL,
-    timestamp   TIMESTAMPTZ     NOT NULL,
-    signal_type TEXT            NOT NULL,   -- 'BUY','SELL'
-    strategy    TEXT            NOT NULL,   -- 'rsi_oversold','ema_cross', etc.
-    price       NUMERIC(12, 4),
-    strength    NUMERIC(4, 2),              -- 0.0 to 1.0
-    metadata    JSONB                       -- extra context
-);
-SELECT create_hypertable('signals', 'timestamp');
-
-
-
-
 CREATE TABLE IF NOT EXISTS indicators (
     symbol           TEXT            NOT NULL,
     resolution       TEXT            NOT NULL,

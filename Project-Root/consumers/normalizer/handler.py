@@ -86,9 +86,9 @@ def make_handler(pool: asyncpg.Pool, producer: AIOKafkaProducer):
         try:
             payload = json.loads(raw)
             logger.debug(f"Message received: offset={msg.offset} partition={msg.partition}")
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             logger.exception(f"Invalid JSON at offset {msg.offset}: {raw[:200]}")
-            return  # malformed message — base_consumer will route to DLT
+            raise e # malformed message — base_consumer will route to DLT
 
         # Finnhub sends periodic {"type": "ping"} heartbeats — skip silently.
         if payload.get("type") != "trade":

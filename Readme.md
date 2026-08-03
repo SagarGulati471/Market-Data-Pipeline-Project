@@ -159,7 +159,7 @@ project-root/
 │
 ├── configs/
 ├── logs/
-
+```
 ## To start the data collector execute the following in the order -
 
 ### Windows
@@ -173,6 +173,22 @@ project-root/
 
 - cd Market_Data_Pipeline_Project/Project-Root
 - python -m data_collectors.fyers.websocket
+
+# Running the Docker Compose file
+
+# Navigate to the path - Project_Root Directory
+
+### To only bring up the app services
+docker compose --profile app_containers up -d
+
+### To only bring up PGAdmin and Kafka-UI
+docker compose --profile infrastructure_containers up -d
+
+### To only bring up the all containers 
+docker compose --profile "*" up -d
+
+### To bring down all the containers
+docker compose --profile "*" down
 
 ### Contributor
 

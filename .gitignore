@@ -12,6 +12,7 @@ Data_collector/kafka/kafka_data/
 .messaging/kafka/data/
 .messaging/kafka/data/*
 data/
+timescale-data/
 
 Project-Root/messaging/kafka/data/*
 Project-Root/storage/timescaledb-deployment/timescaledb-deployment/timescale-data/*

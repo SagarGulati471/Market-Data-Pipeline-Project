@@ -556,7 +556,7 @@ async def produce_indicator(producer: AIOKafkaProducer, indicator: Indicator) ->
     symbol are routed to the same partition, preserving per-symbol message ordering
     for the downstream consumers.
     """
-    topic = config.KAFKA_TOPIC_SIGNAL
+    topic = config.KAFKA_TOPIC_INDICATOR
     try:
         await send_message(
             producer,
