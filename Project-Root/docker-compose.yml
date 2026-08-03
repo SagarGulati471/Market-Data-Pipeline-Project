@@ -1,0 +1,258 @@
+x-common-env: &common-env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092   # Internal Kafka broker address for inter-container communication
+  DB_HOST: ${DB_HOST}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_NAME: ${DB_NAME}
+  DB_USER: ${DB_USER}
+  DB_PASSWORD: ${DB_PASSWORD}
+
+
+
+services:
+  data_collector:
+    image: ${PROJECT_IMAGE}:${PROJECT_VERSION}
+    container_name: data_collector
+    restart: always
+    profiles:
+      - app_containers
+    environment:
+      <<: *common-env
+      FINNHUB_API_TOKEN: ${FINNHUB_API_TOKEN}
+      FINNHUB_WEBSOCKET_URI: ${FINNHUB_WEBSOCKET_URI}
+      FINNHUB_STOCK_SYMBOLS: ${FINNHUB_STOCK_SYMBOLS}
+      FINNHUB_KAFKA_TOPIC: ${FINNHUB_KAFKA_TOPIC}
+    entrypoint: ["python", "-m", "data_collectors.Finnhub.websocket"]
+    networks:
+      - app-network
+    depends_on:
+      kafka:
+        condition: service_healthy  # Ensures that the data_collector service waits for the Kafka service to be healthy before starting. These services takes some time to start up, so this ensures that the data_collector service doesn't attempt to connect to Kafka before it's ready.
+      timescale:
+        condition: service_healthy
+
+
+  normalizer:
+    image: ${PROJECT_IMAGE}:${PROJECT_VERSION}
+    container_name: normalizer
+    restart: always
+    profiles:
+      - app_containers
+    environment:
+      <<: *common-env
+      FINNHUB_KAFKA_TOPIC:  ${FINNHUB_KAFKA_TOPIC}
+      DEAD_LETTER_TOPIC_NORMALIZER: ${DEAD_LETTER_TOPIC_NORMALIZER}
+      KAFKA_TOPIC_NORMALIZED_TRADES: ${KAFKA_TOPIC_NORMALIZED_TRADES}
+    entrypoint: ["python", "-m", "consumers.normalizer.consumer"]
+    networks:
+      - app-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescale:
+        condition: service_healthy
+
+
+  candle_builder:
+    image: ${PROJECT_IMAGE}:${PROJECT_VERSION}
+    container_name: candle_builder
+    profiles:
+      - app_containers
+    restart: always
+    environment:
+      <<: *common-env
+      KAFKA_TOPIC_NORMALIZED_TRADES: ${KAFKA_TOPIC_NORMALIZED_TRADES}
+      KAFKA_TOPIC_CANDLES: ${KAFKA_TOPIC_CANDLES}
+      DEAD_LETTER_TOPIC_CANDLE_BUILDER: ${DEAD_LETTER_TOPIC_CANDLE_BUILDER}
+    entrypoint: ["python", "-m", "consumers.candle_builder.consumer"]
+    networks:
+      - app-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescale:
+        condition: service_healthy
+
+
+
+  indicator_calculator:
+    image: ${PROJECT_IMAGE}:${PROJECT_VERSION}
+    container_name: indicator_calculator
+    profiles:
+      - app_containers
+    restart: always
+    environment:
+      <<: *common-env
+      KAFKA_TOPIC_CANDLES: ${KAFKA_TOPIC_CANDLES}
+      KAFKA_TOPIC_INDICATOR: ${KAFKA_TOPIC_INDICATOR}
+      DEAD_LETTER_TOPIC_INDICATOR: ${DEAD_LETTER_TOPIC_INDICATOR}
+    entrypoint: ["python", "-m", "consumers.indicator.consumer"]
+    networks:
+      - app-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescale:
+        condition: service_healthy
+
+
+
+  signal_generator:
+    image: ${PROJECT_IMAGE}:${PROJECT_VERSION}
+    container_name: signal_generator
+    profiles:
+      - app_containers
+    restart: always
+    environment:
+      <<: *common-env
+      KAFKA_TOPIC_INDICATOR: ${KAFKA_TOPIC_INDICATOR}
+      KAFKA_TOPIC_SIGNAL: ${KAFKA_TOPIC_SIGNAL}
+      DEAD_LETTER_TOPIC_SIGNAL: ${DEAD_LETTER_TOPIC_SIGNAL}
+    entrypoint: ["python", "-m", "consumers.signal_generator.consumer"]
+    networks:
+      - app-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescale:
+        condition: service_healthy
+
+
+
+  kafka:
+    # image: apache/kafka:latest
+    image: apache/kafka:4.2.0
+    container_name: kafka
+    ports:
+      - "9092:9092" # This is what you'll use from host / Python / aiokafka
+      - "29093:29093"
+      - "9093:9093"
+    # profiles:
+    #     - infrastructure_containers
+    environment:
+      KAFKA_NODE_ID: 1 # Unique broker ID
+      KAFKA_PROCESS_ROLES: broker,controller # Broker (handles data), Controller (handles metadata)
+    
+      KAFKA_LISTENERS: 'INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093,CONTROLLER://0.0.0.0:29093'
+      KAFKA_ADVERTISED_LISTENERS: 'INTERNAL://kafka:9092,EXTERNAL://localhost:9093'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERNAL'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # Consumer offsets stored with replication = 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data # By default logs were stored in /tmp/kafka-logs
+    restart: always
+    networks:
+      - infra-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - ./data:/var/lib/kafka/data # Where logs are stored
+
+
+
+  kafka-ui:
+    # image: kafbat/kafka-ui:latest
+    image: kafbat/kafka-ui:v1.5.0
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    profiles:
+        - infrastructure_containers
+    environment:
+      KAFKA_CLUSTERS_0_NAME: TBT-Data # Display name in UI
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092 # Initial connection point (bootstrap)
+      DYNAMIC_CONFIG_ENABLED: "true" # Allows runtime config updates
+    restart: always
+    networks:
+      - infra-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+
+  timescale:
+    # image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:2.27.1-pg16
+    container_name: timescale
+    # profiles:
+    #     - infrastructure_containers
+    environment:
+    - POSTGRES_USER=${DB_USER}
+    - POSTGRES_PASSWORD=${DB_PASSWORD}
+    - POSTGRES_DB=${DB_NAME}
+    ports:
+    - "5432:5432"
+    volumes:
+    - timescale-data:/var/lib/postgresql/data # Defining named volume
+    - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - infra-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+  
+
+
+  pgadmin:
+    image: dpage/pgadmin4:9.15
+    container_name: pgadmin
+    profiles:
+        - infrastructure_containers
+    environment:
+    - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+    - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+    - "5050:80"
+    volumes:
+    - ./docker/pgadmin/pgpass:/pgadmin4/pgpass
+    - ./docker/pgadmin/servers.json:/pgadmin4/servers.json
+    restart: always
+    networks:
+      - infra-network
+    depends_on:
+      timescale:
+        condition: service_healthy
+
+
+volumes:
+  timescale-data:
+
+networks:
+  infra-network:
+    driver: bridge
+    
+  app-network:
+    driver: bridge
+
+
+
+# Note: -
+
+# What healthchecks actually do — explained simply
+# Without a healthcheck, Docker only knows if a container's process is running.
+# But "process running" ≠ "service ready":
+
+# Kafka's JVM starts in ~2s but Kafka itself takes 15–30s to elect a controller and be ready to accept connections
+# TimescaleDB's process starts fast but PostgreSQL needs a few seconds to finish initializing the data directory
+# depends_on: condition: service_healthy tells Docker: don't start my container until the dependency
+# passes its health test. The healthcheck block defines what test to run. Without the healthcheck block,
+#  Docker has no test to run, so the condition can never be satisfied — your app containers would either hang waiting or never start.
+
+
+
+# We are not keeping the kafka and timescale under any profile, as they are core services and not the optional ones
+# They should always be up and running for any of the app services to work. The other services can be started or stopped based on the profile selected.
+# Since the kafka-ui and pgadmin are optional services, they are kept under the infrastructure_containers profile. They can be started or stopped based on the profile selected.
