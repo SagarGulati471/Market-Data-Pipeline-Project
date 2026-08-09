@@ -55,22 +55,26 @@ async def task_push_to_kafka(config):
     Any pre-processing of the data can be done here before sending to Kafka in process_data_from_queue function.
     '''
 
-    KAFKA_TOPIC = config.FINNHUB_KAFKA_TOPIC  # Replace with your actual Kafka topic name
-    KEY = f"TBT_data_{int(time.time() * 1000)}"  # Example key using current timestamp in milliseconds
-    
-    # Creates a Kafka producer instance
-    producer = await create_kafka_producer()
+    KAFKA_TOPIC = config.FINNHUB_KAFKA_TOPIC
+    KEY = f"TBT_data_{int(time.time() * 1000)}"
+
+    producer = None
     while True:
         try:
-            message = await data_queue.get()  # Wait until a message is available in the queue
+            if producer is None:
+                producer = await create_kafka_producer()
+
+            message = await data_queue.get()
             await asyncio.sleep(0)
             logger.debug("Processing message from queue: %s", message)
 
-            # Process the data and push to Kafka
             await send_message(producer, KAFKA_TOPIC, KEY, message)
 
         except Exception as e:
             logger.error(f"Error processing message from queue: {e}")
+            if producer is not None:
+                await shutdown_kafka_producer(producer)
+                producer = None  # force reconnect on next iteration
 
 
 async def data_receiver(websocket):
@@ -102,36 +106,38 @@ async def main():
         Main function to establish WebSocket connection, subscribe to data, and start the data receiver and Kafka producer tasks.
     '''
     logger.info("Connecting to WebSocket...")
-    
+
     config = await load_config()
-    kafka_task = asyncio.create_task(task_push_to_kafka(config))  # Start the data processing task
+    kafka_task = asyncio.create_task(task_push_to_kafka(config))
 
     retries = 0
-    # Establish Websocket Connection
     while True:
         if retries > 0:
             logger.info(f"Retrying WebSocket connection... Attempt #{retries}")
         if retries >= config.WEBSOCKET_MAX_RETRIES:
             logger.error("Max retries reached. Exiting WebSocket client.")
+            kafka_task.cancel()
+            await asyncio.gather(kafka_task, return_exceptions=True)
             return
         try:
             async with websockets.connect(config.FINNHUB_WEBSOCKET_URI) as websocket:
+                retries = 0  # reset on successful connection
 
-                # Subscribe once after connection is established
-                await subscribe_to_data(websocket, config)                
+                # Subscribe to the specified symbols and start receiving data 
+                await subscribe_to_data(websocket, config)
 
-                # Start receiving in this same connection
+                # Start the data receiver to continuously receive messages from the WebSocket
                 await data_receiver(websocket)
 
         except Exception as e:
             retries += 1
             logger.error("Error connecting to WebSocket: %s", str(e))
-            # kafka_task.cancel()
             await asyncio.sleep(config.WEBSOCKET_RETRY_INTERVAL)
-        finally:
 
-            kafka_task.cancel()
-            await asyncio.gather(kafka_task, return_exceptions=True)
+        # recreate kafka_task if it died (e.g. Kafka was unreachable at startup)
+        if kafka_task.done():
+            logger.warning("Kafka publisher task ended unexpectedly, restarting it.")
+            kafka_task = asyncio.create_task(task_push_to_kafka(config))
             
 
 
