@@ -52,7 +52,15 @@ class Config:
         # ORDER EXECUTOR PIPELINE
         self.KAFKA_TOPIC_ORDER_EXECUTOR = os.getenv('KAFKA_TOPIC_ORDER_EXECUTOR', 'orders-executor')
         self.DEAD_LETTER_TOPIC_ORDER_EXECUTOR = os.getenv('DEAD_LETTER_TOPIC_ORDER_EXECUTOR', 'orders-executor-dlt')
+        self.IS_PAPER_TRADING = os.getenv('IS_PAPER_TRADING', 'True').lower() in ('true', '1', 't')
 
+        # RISK MANAGER SETTINGS
+        self.MAX_POSITION_SIZE_PER_SYMBOL = int(os.getenv('MAX_POSITION_SIZE_PER_SYMBOL', 100))
+        self.MAX_OPEN_POSITIONS = int(os.getenv('MAX_OPEN_POSITIONS', 10))
+        self.MAX_CAPITAL_PER_TRADE = float(os.getenv('MAX_CAPITAL_PER_TRADE', 1000.0))
+        self.MAX_DAILY_LOSS = float(os.getenv('MAX_DAILY_LOSS', 5000.0))
+        self.MAX_ORDERS_PER_MINUTE = int(os.getenv('MAX_ORDERS_PER_MINUTE', 5))
+        self.SIGNAL_MAX_AGE_SECONDS = int(os.getenv('SIGNAL_MAX_AGE_SECONDS', 60))  # Maximum age of a signal in seconds before it is considered stale and ignored
 
        # TimescaleDB / PostgreSQL connection settings
         self.DB_HOST     = os.getenv('DB_HOST',     'timescale')
