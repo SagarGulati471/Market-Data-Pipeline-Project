@@ -109,3 +109,19 @@ CREATE TABLE IF NOT EXISTS signals (
     PRIMARY KEY (symbol, resolution, open_time)
 );
 SELECT create_hypertable('signals', 'open_time');
+
+
+
+
+CREATE TABLE IF NOT EXISTS orders (
+    order_id    TEXT            NOT NULL,
+    symbol      TEXT            NOT NULL,
+    side        TEXT            NOT NULL,   -- 'BUY','SELL'
+    type        TEXT            NOT NULL,   -- 'MARKET','LIMIT','STOP'
+    quantity    BIGINT          NOT NULL,
+    price       NUMERIC(12, 4),
+    status      TEXT            NOT NULL,   -- 'PENDING','FILLED','CANCELLED'
+    timestamp   TIMESTAMPTZ     NOT NULL,
+    PRIMARY KEY (order_id, timestamp)
+);
+SELECT create_hypertable('orders', 'timestamp');

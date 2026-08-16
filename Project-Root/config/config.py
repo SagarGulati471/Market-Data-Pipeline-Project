@@ -49,6 +49,10 @@ class Config:
         self.KAFKA_TOPIC_SIGNAL = os.getenv('KAFKA_TOPIC_SIGNAL', 'signals')
         self.DEAD_LETTER_TOPIC_SIGNAL = os.getenv('DEAD_LETTER_TOPIC_SIGNAL', 'signal-dlt')
 
+        # ORDER EXECUTOR PIPELINE
+        self.KAFKA_TOPIC_ORDER_EXECUTOR = os.getenv('KAFKA_TOPIC_ORDER_EXECUTOR', 'orders-executor')
+        self.DEAD_LETTER_TOPIC_ORDER_EXECUTOR = os.getenv('DEAD_LETTER_TOPIC_ORDER_EXECUTOR', 'orders-executor-dlt')
+
 
        # TimescaleDB / PostgreSQL connection settings
         self.DB_HOST     = os.getenv('DB_HOST',     'timescale')
