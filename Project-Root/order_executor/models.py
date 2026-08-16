@@ -48,6 +48,9 @@ class RiskDecisionReason(str, Enum):
     RATE_LIMIT_EXCEEDED     =  "RATE_LIMIT_EXCEEDED"
     STALE_SIGNAL            =  "STALE_SIGNAL"
     MAX_POSITION_REACHED    =  "MAX_POSITION_REACHED"
+    NO_POSITION_TO_SELL     =  "NO_POSITION_TO_SELL"
+    MAX_POSITION_REACHED_PER_SYMBOL =  "MAX_POSITION_REACHED_PER_SYMBOL"
+    MAX_CAPITAL_PER_TRADE_EXCEEDED = "MAX_CAPITAL_PER_TRADE_EXCEEDED"
     OTHER                   =  "OTHER"
 
 
@@ -64,15 +67,21 @@ class RiskConfig(BaseModel):
     max_daily_loss:                 Decimal  # kill switch or a circuit breaker: stop trading if loss exceeds this
     max_orders_per_minute:          int      # rate limit
     signal_max_age_seconds:         int      # Maximum age of a signal in seconds before it is considered stale and ignored (reject signals older than this)
+    cooldown_seconds:               int      # Cooldown period in seconds to prevent duplicate signals (reject signals for the same symbol within this time frame)
 
 
-class CurrentPositionSize:
+# Acts as a In-memory cache to keep:
+# current position sizes, daily PnL, and pending orders for the trading session.
+# This is used by the RiskManager to make risk decisions.
+class CurrentPositionSize:  
     def __init__(self):   
         self._holdings            : dict[str,int]      = {}  # symbol -> quantity
         self._daily_pnl           : Decimal            = Decimal(0)  # daily profit and loss
         self._pending_orders      : dict[str,Order]    = {}  # # order_id → Order
         self._order_times         : list[datetime]     = []  # timestamps of recent orders for rate limiting
         self._avg_cost_per_symbol : dict[str, Decimal] = {}  # symbol -> average cost per share for PnL calculations
+        self._recent_signals      : dict[str, datetime] = {}  # symbol -> timestamp of the last signal received for that symbol, used to prevent duplicate signals
+
 
     def get_quantity(self, symbol: str) -> int:
         return self._holdings.get(symbol, 0)
@@ -86,11 +95,13 @@ class CurrentPositionSize:
         # Position count is the number of unique symbols currently held in the portfolio
         return sum(1 for qty in self._holdings.values() if qty > 0)  # Count only symbols with positive holdings
 
+
     def recent_order_count(self, window_seconds: int) -> int:
         # Count how many orders were placed within the last 'window_seconds' seconds
         now = datetime.now()
         cutoff_time = now - timedelta(seconds=window_seconds)
         return sum(1 for order_time in self._order_times if order_time >= cutoff_time)
+
 
     # Picks the order from the pending orders and updates its status to FILLED,
     # also updates the position and daily PnL accordingly.

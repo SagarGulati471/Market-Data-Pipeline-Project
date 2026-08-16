@@ -29,7 +29,7 @@ class OrderManager:
         # This function will perform the following steps:
 
         # 1.) Calculate Risk by passing the order to the RiskManager
-        risk_passed = self.risk_manager.calculate_risk(signal)
+        risk_passed = self.risk_manager.calculate_risk(signal, self.positions)
         logger.info(f"Risk check for order {signal}: {'Passed' if risk_passed else 'Failed'}")
         
         

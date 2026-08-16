@@ -20,13 +20,12 @@ Most important check in any algo system. If you've lost more than $X today, stop
 today's_realized_loss > max_daily_loss → REJECT ALL orders for today
 
 
-Every professional system has this. It's non-negotiable.
 
 4. Duplicate signal guard
 The same signal fired twice within 30 seconds (same symbol, same side, same strategy)? Ignore the second one. Your signal generator can fire duplicates — the risk manager is the last line of defense.
 
 5. Conflicting position check
-Receiving a BUY for AAPL but already have a SELL order pending for AAPL? These conflict — reject the new one until the pending order resolves.
+Receiving a BUY for AAPL but already have a SELL order pending for AAPL? These conflict reject the new one until the pending order resolves.
 
 6. Max position per symbol
 Already holding 100 shares of AAPL and getting another BUY signal? Reject — you're at your limit. Prevents over-concentration in one stock.
@@ -39,3 +38,19 @@ The signal implies buying at $150 × 10 shares = $1500. Do you have $1500 availa
 
 9. Order rate limit
 Placed 20 orders in the last 60 seconds? Slow down. Broker APIs have rate limits and will reject or ban you if you exceed them. Track order count in a rolling time window.
+
+
+
+-----------------------------------------------------------------------------------------------
+
+# Quantity - how do HFTs and algo traders decide?
+Your signal tells you direction (BUY/SELL) but not how much. There are several approaches:
+
+1. Fixed quantity — always buy 10 shares. Simple, but ignores account size and price level. Not used professionally.
+
+2. Fixed capital per trade — always spend $X. quantity = floor(max_capital_per_trade / signal_price). You already have max_capital_per_trade in RiskConfig. This is the simplest professional approach and the right one to implement first.
+
+3. Fixed fractional (% of capital) — risk X% of total capital per trade. quantity = floor((total_capital × 0.02) / price). Very common in retail algo trading. Forces position size to scale with account size.
+
+4. Volatility-adjusted sizing (ATR-based) — size inversely proportional to how volatile the asset is. High volatility = smaller position (less risk). quantity = floor(risk_per_trade / (ATR × price)). This is what sophisticated systematic traders use — your indicator pipeline already computes ATR.
+

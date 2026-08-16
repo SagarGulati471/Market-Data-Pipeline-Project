@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS signals (
     symbol                     TEXT            NOT NULL,
     resolution                 TEXT            NOT NULL,
     open_time                  TIMESTAMPTZ     NOT NULL,
+    close_price                DOUBLE PRECISION NOT NULL,
     signal_type                TEXT            NOT NULL CHECK (signal_type IN ('BUY', 'SELL', 'HOLD', 'STRONG_BUY', 'STRONG_SELL')),
     strategy_EMA_crossover     TEXT            NOT NULL CHECK (strategy_EMA_crossover IN ('BUY', 'SELL', 'HOLD')),
     strategy_RSI_reversal      TEXT            NOT NULL CHECK (strategy_RSI_reversal IN ('BUY', 'SELL', 'HOLD')),

@@ -61,6 +61,9 @@ class Config:
         self.MAX_DAILY_LOSS = float(os.getenv('MAX_DAILY_LOSS', 5000.0))
         self.MAX_ORDERS_PER_MINUTE = int(os.getenv('MAX_ORDERS_PER_MINUTE', 5))
         self.SIGNAL_MAX_AGE_SECONDS = int(os.getenv('SIGNAL_MAX_AGE_SECONDS', 60))  # Maximum age of a signal in seconds before it is considered stale and ignored
+        self.MAX_CAPITAL_PER_TRADE_EXCEEDED = float(os.getenv('MAX_CAPITAL_PER_TRADE_EXCEEDED', 1000.0))    # In USD($) 
+        self.COOLDOWN_SECONDS = int(os.getenv('COOLDOWN_SECONDS', 60))  # Cooldown period in seconds to prevent duplicate signals
+
 
        # TimescaleDB / PostgreSQL connection settings
         self.DB_HOST     = os.getenv('DB_HOST',     'timescale')

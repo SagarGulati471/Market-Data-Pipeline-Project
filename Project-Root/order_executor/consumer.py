@@ -21,12 +21,14 @@ def make_handler(pool, producer, config):
     
     current_position_size = CurrentPositionSize()
     risk_config = RiskConfig(
-        max_position_size_per_symbol =  config.MAX_POSITION_SIZE_PER_SYMBOL,
-        max_open_positions           =  config.MAX_OPEN_POSITIONS,
-        max_capital_per_trade        =  config.MAX_CAPITAL_PER_TRADE,
-        max_daily_loss               =  config.MAX_DAILY_LOSS,
-        max_orders_per_minute        =  config.MAX_ORDERS_PER_MINUTE,
-        signal_max_age_seconds       =  config.SIGNAL_MAX_AGE_SECONDS
+        max_position_size_per_symbol     =  config.MAX_POSITION_SIZE_PER_SYMBOL,
+        max_open_positions               =  config.MAX_OPEN_POSITIONS,
+        max_capital_per_trade            =  config.MAX_CAPITAL_PER_TRADE,
+        max_daily_loss                   =  config.MAX_DAILY_LOSS,
+        max_orders_per_minute            =  config.MAX_ORDERS_PER_MINUTE,
+        signal_max_age_seconds           =  config.SIGNAL_MAX_AGE_SECONDS,
+        max_capital_per_trade_exceeded   =  config.MAX_CAPITAL_PER_TRADE_EXCEEDED,
+        cooldown_seconds                 =  config.COOLDOWN_SECONDS,
     )
 
     order_manager = OrderManager(risk_config=risk_config, current_position_size=current_position_size, db_pool=pool, kafka_producer=producer)
@@ -105,7 +107,6 @@ async def main():
 
         logger.info("Order executor pipeline shutdown complete.")
     
-
 
 
 if __name__ == "__main__":
