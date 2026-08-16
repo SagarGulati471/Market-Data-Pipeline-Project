@@ -1,1 +1,1 @@
-The Images are AI generated based on the Project's goals and Architecture
+This Image is AI generated based on the Project's goals and Architecture
