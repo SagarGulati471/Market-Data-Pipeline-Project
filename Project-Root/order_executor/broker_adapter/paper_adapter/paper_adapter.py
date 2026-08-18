@@ -11,7 +11,7 @@ class PaperAdapter(BrokerAdapter):
 
     async def place_order(self, order):
         # Simulate placing an order in a paper trading environment
-        print(f"Placing paper order: {order}")
+        print(f"Placing paper order: {order}, close_price: {order.price}, quantity: {order.quantity}")
         return {"status": "success", "order_id": "paper_order_123"} # Placeholder order ID for paper trading
 
     async def cancel_order(self, order_id):

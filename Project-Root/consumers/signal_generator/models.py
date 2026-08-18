@@ -1,4 +1,5 @@
 import datetime
+from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from enum import Enum
@@ -15,6 +16,7 @@ class StrategySignal(str, Enum):
     HOLD = "HOLD"
 
 class Signal(BaseModel):
+    signal_id:                str              = Field(default_factory=lambda: str(uuid4()))
     symbol: str
     resolution: str
     open_time: datetime.datetime
