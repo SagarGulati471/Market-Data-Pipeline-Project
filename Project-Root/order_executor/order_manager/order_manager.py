@@ -23,8 +23,10 @@ class OrderManager:
     _BUY_SIGNALS  = frozenset({SignalType.BUY,  SignalType.STRONG_BUY})
     _SELL_SIGNALS = frozenset({SignalType.SELL, SignalType.STRONG_SELL})
 
-    def __init__(self, risk_config, position_state):
+    def __init__(self, risk_config, position_state, db_pool, kafka_producer):
         self.risk_config = risk_config
+        self.db_pool = db_pool
+        self.kafka_producer = kafka_producer
 
         self.risk_manager = RiskManager(risk_config)
         self.positions = position_state
@@ -65,7 +67,7 @@ class OrderManager:
             status           = OrderStatus.PENDING,
             timestamp        = datetime.now(ZoneInfo("America/New_York")),
         )
-        execution_result = await self.order_executor.place_order(order)
+        execution_result = await self.order_executor.place_order(order, self.db_pool)
         logger.info(f"Order execution result for {signal}: {execution_result}")
 
 
