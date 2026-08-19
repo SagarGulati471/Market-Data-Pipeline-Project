@@ -14,9 +14,11 @@ from config.config import Config
 from risk_manager.risk_manager import RiskManager
 from broker_adapter.paper_adapter.paper_adapter import PaperAdapter
 from ..models import Order, OrderSide, OrderType, OrderStatus
+from ...messaging.kafka_service.service import send_message
 from ...consumers.signal_generator.models import SignalType
 
 logger = logging.getLogger(__name__)
+config = Config()
 
 class OrderManager:
 
@@ -31,7 +33,7 @@ class OrderManager:
         self.risk_manager = RiskManager(risk_config)
         self.positions = position_state
         if Config.IS_PAPER_TRADING:
-            self.order_executor = PaperAdapter()
+            self.order_executor = PaperAdapter(self.db_pool)
             logger.info("Paper trading mode enabled. Using PaperAdapter for order execution.")
         else:
             # Placeholder for a real broker adapter, e.g., AlpacaAdapter or InteractiveBrokersAdapter
@@ -67,14 +69,23 @@ class OrderManager:
             status           = OrderStatus.PENDING,
             timestamp        = datetime.now(ZoneInfo("America/New_York")),
         )
-        execution_result = await self.order_executor.place_order(order, self.db_pool)
+        self.positions.add_order(order)  # track as pending before calling broker
+        execution_result = await self.order_executor.place_order(order)
+        self.positions.record_fill(order.order_id, execution_result.filled_price)
         logger.info(f"Order execution result for {signal}: {execution_result}")
 
 
-        
-        # 2.) Place the order if it passes risk checks by passing it to the PaperAdapter
-        # 3.) If the order fails risk then do something
-        # 4.) If the order passes risk then push to Kafka and store in TimescaleDB
+        # Push the order execution result to Kafka for further processing or logging
+        if execution_result.status == OrderStatus.FILLED:
+            await send_message(
+                producer=self.kafka_producer,
+                topic=config.KAFKA_TOPIC_ORDER_EXECUTOR,
+                key=execution_result.order_id,
+                value=execution_result.model_dump(mode='json')
+            )
+            logger.info(f"Order execution result for {signal} sent to Kafka topic 'order_execution_results'.")
+        else:
+            logger.warning(f"Order execution for {signal} did not result in a filled order. Status: {execution_result.status}")
 
-        
-        return True  # Placeholder for actual order handling logic
+        logger.info(f"Order handling completed for signal {signal.signal_id}. Execution result: {execution_result}")
+        return True

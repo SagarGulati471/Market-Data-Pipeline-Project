@@ -74,7 +74,6 @@ class PaperAdapter(BrokerAdapter):
 
     async def get_order_status(self, order_id):
         # Simulate getting the status of an order in a paper trading environment
-        print(f"Getting status for paper order: {order_id}")
         return {"status": "filled", "order_id": order_id}
 
     async def get_positions(self):
