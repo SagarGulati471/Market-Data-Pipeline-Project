@@ -28,7 +28,7 @@ class OrderStatus(str, Enum):
 
 class Order(BaseModel):
     order_id:          str               = Field(..., description="Unique identifier for the order")
-    source_signal_id:  str               = Field(..., description="signal_id of the Signal that triggered this order")
+    source_signal_id:  Optional[str]               = Field(..., description="signal_id of the Signal that triggered this order")
     symbol:            str               = Field(..., description="Trading symbol for the order")
     side:              OrderSide         = Field(..., description="Side of the order (buy/sell)")
     ordertype:         OrderType         = Field(..., description="Type of the order (market/limit/stop)")
@@ -97,7 +97,9 @@ class CurrentPositionSize:
         # Position count is the number of unique symbols currently held in the portfolio
         return sum(1 for qty in self._holdings.values() if qty > 0)  # Count only symbols with positive holdings
 
-
+    def get_all_open_positions(self) -> dict[str, int]:
+        return dict(self._holdings)  # snapshot — caller iterating while fills modify _holdings
+         
     def recent_order_count(self, window_seconds: int) -> int:
         # Count how many orders were placed within the last 'window_seconds' seconds
         now = datetime.now()

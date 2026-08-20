@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-from config.config import Config
 import signal
 
 from utils.logger import setup_logger
@@ -11,28 +10,14 @@ from messaging.kafka_service.service import create_kafka_producer, shutdown_kafk
 from storage.timescaledb_deployment.db_wrapper import init_pool, close_pool
 from order_executor.models import Order, RiskConfig, CurrentPositionSize
 from consumers.signal_generator.models import Signal
-from .order_manager.order_manager import OrderManager
+from .order_manager.order_manager import OrderManager, intraday_auto_square_off
 
 setup_logger()
 logger = logging.getLogger(__name__)
 
 
-def make_handler(pool, producer, config):
+def make_handler(order_manager):
     
-    current_position_size = CurrentPositionSize()
-    risk_config = RiskConfig(
-        max_position_size_per_symbol     =  config.MAX_POSITION_SIZE_PER_SYMBOL,
-        max_open_positions               =  config.MAX_OPEN_POSITIONS,
-        max_capital_per_trade            =  config.MAX_CAPITAL_PER_TRADE,
-        max_daily_loss                   =  config.MAX_DAILY_LOSS,
-        max_orders_per_minute            =  config.MAX_ORDERS_PER_MINUTE,
-        signal_max_age_seconds           =  config.SIGNAL_MAX_AGE_SECONDS,
-        max_capital_per_trade_exceeded   =  config.MAX_CAPITAL_PER_TRADE_EXCEEDED,
-        cooldown_seconds                 =  config.COOLDOWN_SECONDS,
-    )
-
-    order_manager = OrderManager(risk_config=risk_config, current_position_size=current_position_size, db_pool=pool, kafka_producer=producer)
-
     async def handle_message(msg):
         """
         Handle incoming Kafka messages for order execution.
@@ -57,8 +42,11 @@ def make_handler(pool, producer, config):
             logger.exception(f"Failed to parse message: {e} raw={raw}")
             raise e
 
-
-        return await order_manager.handle_order(signal)  # Here 'signal' is actually a Signal instance, the message received by the Signal Generator Pipeline 
+        try:
+            return await order_manager.handle_order(signal)  # Here 'signal' is actually a Signal instance, the message received by the Signal Generator Pipeline 
+        except Exception as e:
+            logger.exception(f"Failed to handle order for signal: {signal} error: {e}")
+            raise e
 
     return handle_message
 
@@ -74,7 +62,20 @@ async def main():
     producer = await create_kafka_producer()
     dlt_producer = await create_kafka_producer()
 
-    handler = make_handler(pool=db_pool, producer=producer, config=config)
+    current_position_size = CurrentPositionSize()
+    risk_config = RiskConfig(
+        max_position_size_per_symbol     =  config.MAX_POSITION_SIZE_PER_SYMBOL,
+        max_open_positions               =  config.MAX_OPEN_POSITIONS,
+        max_daily_loss                   =  config.MAX_DAILY_LOSS,
+        max_orders_per_minute            =  config.MAX_ORDERS_PER_MINUTE,
+        signal_max_age_seconds           =  config.SIGNAL_MAX_AGE_SECONDS,
+        max_capital_per_trade            =  config.MAX_CAPITAL_PER_TRADE,
+        cooldown_seconds                 =  config.COOLDOWN_SECONDS,
+    )
+
+    order_manager = OrderManager(risk_config=risk_config, position_state=current_position_size, db_pool=db_pool, kafka_producer=producer)
+    handler = make_handler(order_manager=order_manager)
+    intraday_auto_square_off_task = asyncio.create_task(intraday_auto_square_off(current_position_size, order_manager))
 
     consumer = KafkaConsumerService(
         topic=config.KAFKA_TOPIC_SIGNAL,
@@ -104,7 +105,7 @@ async def main():
         await shutdown_kafka_producer(producer)
         await shutdown_kafka_producer(dlt_producer)
         await close_pool(db_pool)
-
+        intraday_auto_square_off_task.cancel()
         logger.info("Order executor pipeline shutdown complete.")
     
 

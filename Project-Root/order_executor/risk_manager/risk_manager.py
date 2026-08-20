@@ -149,7 +149,7 @@ class RiskManager():
                     'close_price': str(close_price),
                     'quantity': quantity,
                     'capital_required': str(close_price * Decimal(quantity)),
-                    'max_capital_per_trade': str(self.risk_config.max_capital_per_trade)
+                    'max_capital_per_trade': str(self.risk_config.max_capital_per_trade_exceeded)
                 }
                 return result
 
