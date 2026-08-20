@@ -18,7 +18,6 @@ class OrderType(str, Enum):
 
 
 class OrderStatus(str, Enum):
-    PENDING   =  "PENDING"      # order has been created but not yet sent to the broker.
     SUBMITTED =  "SUBMITTED"    # order has been sent to the broker but not yet executed.
     FILLED    =  "FILLED"       # fully executed by the broker.
     REJECTED  =  "REJECTED"     # broker refused it (insufficient funds, invalid symbol).
@@ -28,7 +27,7 @@ class OrderStatus(str, Enum):
 
 class Order(BaseModel):
     order_id:          str               = Field(..., description="Unique identifier for the order")
-    source_signal_id:  Optional[str]               = Field(..., description="signal_id of the Signal that triggered this order")
+    source_signal_id:  Optional[str]     = Field(..., description="signal_id of the Signal that triggered this order")
     symbol:            str               = Field(..., description="Trading symbol for the order")
     side:              OrderSide         = Field(..., description="Side of the order (buy/sell)")
     ordertype:         OrderType         = Field(..., description="Type of the order (market/limit/stop)")
@@ -152,8 +151,19 @@ class CurrentPositionSize:
 
     
     def add_order(self, order: Order):
+        """
+        Adds a new order to the pending orders and records the time of the order for rate limiting.
+        """
         self._pending_orders[order.order_id] = order
         now = datetime.now()
         self._order_times.append(now)
         cutoff_time = now - timedelta(seconds=60)
         self._order_times = [t for t in self._order_times if t >= cutoff_time]
+
+
+    def reconcile(self, orders) -> None:
+        if not orders:
+            return
+        for order in orders:
+            quantity_change = order['quantity'] if order['side'] == OrderSide.BUY.value else -order['quantity']
+            self.update_position(order['symbol'], quantity_change, order['filled_price'])

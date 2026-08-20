@@ -9,6 +9,7 @@ from messaging.kafka_service.base_consumer import KafkaConsumerService
 from messaging.kafka_service.service import create_kafka_producer, shutdown_kafka_producer
 from storage.timescaledb_deployment.db_wrapper import init_pool, close_pool
 from order_executor.models import Order, RiskConfig, CurrentPositionSize
+from .order_repository import fetch_todays_filled_orders
 from consumers.signal_generator.models import Signal
 from .order_manager.order_manager import OrderManager, intraday_auto_square_off
 
@@ -61,8 +62,12 @@ async def main():
     db_pool  = await init_pool()
     producer = await create_kafka_producer()
     dlt_producer = await create_kafka_producer()
-
     current_position_size = CurrentPositionSize()
+
+    # Rebuild in-memory position state from today's filled orders in case of a restart
+    todays_orders = await fetch_todays_filled_orders(db_pool)
+    current_position_size.reconcile(todays_orders)
+
     risk_config = RiskConfig(
         max_position_size_per_symbol     =  config.MAX_POSITION_SIZE_PER_SYMBOL,
         max_open_positions               =  config.MAX_OPEN_POSITIONS,

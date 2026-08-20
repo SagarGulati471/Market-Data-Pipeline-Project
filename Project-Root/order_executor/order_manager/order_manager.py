@@ -41,10 +41,10 @@ class OrderManager:
             # self.order_executor = SomeRealBrokerAdapter()  # To be replaced with actual broker adapter
             pass
 
+
     async def handle_order(self, signal):
 
         # This function will perform the following steps:
-
         # 1.) Calculate Risk by passing the order to the RiskManager
         risk_passed = self.risk_manager.calculate_risk(signal, self.positions)
         logger.debug(f"Risk check for order {signal}: {'Passed' if risk_passed.approved else 'Failed'}, risk_passed: {risk_passed}")

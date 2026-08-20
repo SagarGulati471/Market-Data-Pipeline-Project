@@ -1,6 +1,8 @@
 # DB Wrapper for asyncpg connection pool
 # db_pool is initialized in the consumer file once and is passed to this wrapper,
 # and it manages the database operations for orders.
+import datetime
+
 from ...models import Order, OrderSide
 
 class DatabaseWrapper:
@@ -53,8 +55,7 @@ class DatabaseWrapper:
                 timestamp=result['timestamp']
             )
             return order
-
-
+        
     async def update_order_status(self, order_id, new_status, filled_price=None, filled_at=None):
         async with self.db_pool.acquire() as connection:
             async with connection.transaction():
