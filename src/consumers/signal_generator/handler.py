@@ -27,11 +27,11 @@ STRATEGY_CONFIG = [
     ("strategy_VWAP_confluence", VWAP_confluence_check, 0.25),
 ]
 
-THRESHOLD_BUY          =  0.50
-THRESHOLD_STRONG_BUY   =  0.75
-THRESHOLD_SELL         = -0.50
-THRESHOLD_STRONG_SELL  = -0.75
-THRESHOLD_HOLD         =  0.0  # This is the lower bound for HOLD. Anything between -0.50 and 0.50 is considered HOLD.
+THRESHOLD_BUY          = config.SIGNAL_THRESHOLD_BUY
+THRESHOLD_STRONG_BUY   = config.SIGNAL_THRESHOLD_STRONG_BUY
+THRESHOLD_SELL         = config.SIGNAL_THRESHOLD_SELL
+THRESHOLD_STRONG_SELL  = config.SIGNAL_THRESHOLD_STRONG_SELL
+THRESHOLD_HOLD         = 0.0  # This is the lower bound for HOLD. Anything between -0.50 and 0.50 is considered HOLD.
 
 def make_handler(pool, producer):
     

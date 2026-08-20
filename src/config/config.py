@@ -48,6 +48,10 @@ class Config:
         # SIGNAL GENERATOR PIPELINE
         self.KAFKA_TOPIC_SIGNAL = os.getenv('KAFKA_TOPIC_SIGNAL', 'signals')
         self.DEAD_LETTER_TOPIC_SIGNAL = os.getenv('DEAD_LETTER_TOPIC_SIGNAL', 'signal-dlt')
+        self.SIGNAL_THRESHOLD_BUY         = float(os.getenv('SIGNAL_THRESHOLD_BUY',         0.50))
+        self.SIGNAL_THRESHOLD_STRONG_BUY  = float(os.getenv('SIGNAL_THRESHOLD_STRONG_BUY',  0.75))
+        self.SIGNAL_THRESHOLD_SELL        = float(os.getenv('SIGNAL_THRESHOLD_SELL',        -0.50))
+        self.SIGNAL_THRESHOLD_STRONG_SELL = float(os.getenv('SIGNAL_THRESHOLD_STRONG_SELL', -0.75))
 
         # ORDER EXECUTOR PIPELINE
         self.KAFKA_TOPIC_ORDER_EXECUTOR = os.getenv('KAFKA_TOPIC_ORDER_EXECUTOR', 'orders-executor')
