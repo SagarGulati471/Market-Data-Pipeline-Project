@@ -107,7 +107,7 @@ There is also a background task that fires at 3:30 PM ET to auto square-off any 
 ## Project Structure
 
 ```
-Project-Root/
+src/
 ├── config/                  # Central config loaded from environment variables
 ├── consumers/
 │   ├── normalizer/          # Stage 1: raw → normalized trades
@@ -151,7 +151,7 @@ Project-Root/
 
 ```bash
 git clone <repo-url>
-cd Market-Data-Pipeline-Project/Project-Root
+cd Market-Data-Pipeline-Project/src
 ```
 
 ### 2. Set up your environment file
@@ -254,7 +254,7 @@ See `.env.example` for the full list with descriptions. Key variables:
 ## Running Locally (without Docker)
 
 ```bash
-cd Project-Root
+cd src
 python -m venv venv_3.14
 source venv_3.14/bin/activate
 pip install -r requirements.txt
