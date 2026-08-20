@@ -7,7 +7,7 @@ from .cache import PaperAdapterCache
 from .db_wrapper import DatabaseWrapper
 from ..base import BrokerAdapter
 from ...models import Order, OrderSide, OrderStatus
-from ....utils.logger import setup_logger
+from utils.logger import setup_logger
 
 
 setup_logger()

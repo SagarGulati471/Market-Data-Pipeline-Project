@@ -18,6 +18,7 @@ class OrderType(str, Enum):
 
 
 class OrderStatus(str, Enum):
+    PENDING   =  "PENDING"      # order has been created but not yet sent to the broker.
     SUBMITTED =  "SUBMITTED"    # order has been sent to the broker but not yet executed.
     FILLED    =  "FILLED"       # fully executed by the broker.
     REJECTED  =  "REJECTED"     # broker refused it (insufficient funds, invalid symbol).

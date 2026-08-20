@@ -3,7 +3,7 @@ import logging
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 from ..models import RiskDecision, RiskConfig, RiskDecisionReason, OrderSide
-from ...consumers.signal_generator.models import SignalType
+from consumers.signal_generator.models import SignalType
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,9 @@ class RiskManager():
                 return result
 
 
-        # 5.) Conflicting position 
+        # 5.) Conflicting position
+        # Check if there's a pending order for the same symbol that conflicts with the current signal's side.
+        # For example, if there's a pending BUY order and the new signal is a SELL, or vice versa.
         pending_orders = positions._pending_orders
         for order in pending_orders.values():
             if order.symbol == signal.symbol and (((order.side == OrderSide.BUY) and signal.signal_type in self._SELL_SIGNALS) or (order.side == OrderSide.SELL and signal.signal_type in self._BUY_SIGNALS)):

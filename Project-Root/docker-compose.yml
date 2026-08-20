@@ -286,3 +286,33 @@ networks:
 # We are not keeping the kafka and timescale under any profile, as they are core services and not the optional ones
 # They should always be up and running for any of the app services to work. The other services can be started or stopped based on the profile selected.
 # Since the kafka-ui and pgadmin are optional services, they are kept under the infrastructure_containers profile. They can be started or stopped based on the profile selected.
+
+
+
+
+'''
+# ****************************** Some Useful Commands ******************************
+
+
+1.) To start all services (including optional ones like kafka-ui and pgadmin):
+    docker-compose --profile infrastructure_containers --profile app_containers up -d
+      or 
+    docker-compose --profile "*" up -d
+  
+2.) To start all the services without building the images (if they are already built):
+    docker-compose --profile "*" up -d
+
+3.) To start all the services and build the images (if they are not built or if there are changes in the Dockerfile):
+    docker-compose --profile "*" up -d --build  
+
+4.) To start only the core services (data_collector, normalizer, candle_builder, indicator_calculator, signal_generator, order_executor, kafka, timescale):
+    docker-compose --profile app_containers up -d
+
+5.) To start only the optional services (kafka-ui, pgadmin):
+    docker-compose --profile infrastructure_containers up -d
+
+6.) To start a specific service (e.g., data_collector) without starting its dependencies:
+    docker-compose up -d --no-deps <service_name>
+# --no-deps will start the specified service without starting any of its dependencies. This is useful if you want to start a service that depends on other services, but you know those other services are already running and healthy. For example, if you want to restart the order_executor service without restarting kafka or timescale, you can use this command.
+
+'''

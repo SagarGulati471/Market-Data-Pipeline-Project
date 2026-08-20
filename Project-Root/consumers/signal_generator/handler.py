@@ -1,5 +1,6 @@
 import json
 import logging
+from uuid import uuid4
 import asyncpg
 import asyncio
 from aiokafka import AIOKafkaProducer
@@ -111,6 +112,7 @@ def generate_signal(indicator, prev_indicator):
         threshold = THRESHOLD_HOLD
 
     return Signal(
+        signal_id=str(uuid4()),
         symbol=indicator.symbol,
         resolution=indicator.resolution,
         open_time=indicator.open_time,  
@@ -167,8 +169,8 @@ async def ingest_into_db(pool: asyncpg.Pool, signal: Signal) -> None:
         """
 
         INSERT_QUERY="""      
-        INSERT INTO signals (symbol, resolution, open_time, close_price, signal_type, strategy_EMA_crossover, strategy_RSI_reversal, strategy_MACD_crossover, strategy_VWAP_confluence, weighted_score, threshold)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        INSERT INTO signals (symbol, resolution, open_time, signal_id, close_price, signal_type, strategy_EMA_crossover, strategy_RSI_reversal, strategy_MACD_crossover, strategy_VWAP_confluence, weighted_score, threshold)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         ON CONFLICT (symbol,resolution,open_time) DO NOTHING
         """
         try:
@@ -178,6 +180,7 @@ async def ingest_into_db(pool: asyncpg.Pool, signal: Signal) -> None:
                       signal.symbol,
                       signal.resolution,
                       signal.open_time,
+                      signal.signal_id,
                       signal.close_price,
                       signal.signal_type,
                       signal.strategy_EMA_crossover,

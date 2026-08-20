@@ -115,14 +115,17 @@ SELECT create_hypertable('signals', 'open_time');
 
 
 CREATE TABLE IF NOT EXISTS orders (
-    order_id    TEXT            NOT NULL,
-    symbol      TEXT            NOT NULL,
-    side        TEXT            NOT NULL,   -- 'BUY','SELL'
-    type        TEXT            NOT NULL,   -- 'MARKET','LIMIT','STOP'
-    quantity    BIGINT          NOT NULL,
-    price       NUMERIC(12, 4),
-    status      TEXT            NOT NULL,   -- 'PENDING','FILLED','CANCELLED'
-    timestamp   TIMESTAMPTZ     NOT NULL,
+    order_id          TEXT            NOT NULL,
+    source_signal_id  TEXT            NOT NULL,
+    symbol            TEXT            NOT NULL,
+    side              TEXT            NOT NULL,   -- 'BUY','SELL'
+    ordertype         TEXT            NOT NULL,   -- 'MARKET','LIMIT','STOP'
+    quantity          BIGINT          NOT NULL,
+    price             NUMERIC(12, 4),
+    filled_price      NUMERIC(12, 4),
+    status            TEXT            NOT NULL,   -- 'PENDING','FILLED','CANCELLED'
+    filled_at         TIMESTAMPTZ,
+    timestamp         TIMESTAMPTZ     NOT NULL,
     PRIMARY KEY (order_id, timestamp)
 );
 SELECT create_hypertable('orders', 'timestamp');
