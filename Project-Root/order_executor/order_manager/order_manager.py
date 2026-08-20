@@ -12,11 +12,11 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 import logging
 from config.config import Config
-from risk_manager.risk_manager import RiskManager
-from broker_adapter.paper_adapter.paper_adapter import PaperAdapter
+from ..risk_manager.risk_manager import RiskManager
+from ..broker_adapter.paper_adapter.paper_adapter import PaperAdapter
 from ..models import Order, OrderSide, OrderType, OrderStatus
-from ...messaging.kafka_service.service import send_message
-from ...consumers.signal_generator.models import SignalType
+from messaging.kafka_service.service import send_message
+from consumers.signal_generator.models import SignalType
 
 logger = logging.getLogger(__name__)
 config = Config()
@@ -41,10 +41,10 @@ class OrderManager:
             # self.order_executor = SomeRealBrokerAdapter()  # To be replaced with actual broker adapter
             pass
 
+
     async def handle_order(self, signal):
 
         # This function will perform the following steps:
-
         # 1.) Calculate Risk by passing the order to the RiskManager
         risk_passed = self.risk_manager.calculate_risk(signal, self.positions)
         logger.debug(f"Risk check for order {signal}: {'Passed' if risk_passed.approved else 'Failed'}, risk_passed: {risk_passed}")
@@ -91,6 +91,7 @@ class OrderManager:
         logger.info(f"Order handling completed for signal {signal.signal_id}. Execution result: {execution_result}")
         return True
 
+
     async def execute_square_off_order(self, order):
         '''
         Dedicated function to place square-off orders at the end of the trading day.
@@ -118,8 +119,6 @@ class OrderManager:
         return True
 
     
-
-
 async def intraday_auto_square_off(current_position_state, order_manager):
     """
     This function is responsible for automatically squaring off all open positions at the end of the trading day.

@@ -1,9 +1,11 @@
 import datetime
+import logging
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 from ..models import RiskDecision, RiskConfig, RiskDecisionReason, OrderSide
-from ...consumers.signal_generator.models import SignalType
+from consumers.signal_generator.models import SignalType
 
+logger = logging.getLogger(__name__)
 
 class RiskManager():
     _BUY_SIGNALS  = frozenset({SignalType.BUY,  SignalType.STRONG_BUY})
@@ -22,6 +24,7 @@ class RiskManager():
         if signal.signal_type == SignalType.HOLD:
             result.approved = False
             result.reason = RiskDecisionReason.SIGNAL_IS_HOLD
+            logger.debug("HOLD signal skipped: symbol=%s", signal.symbol)
             return result
 
 
@@ -31,6 +34,7 @@ class RiskManager():
             result.approved = False
             result.reason = RiskDecisionReason.STALE_SIGNAL
             result.details['signal_age'] = signal_age
+            logger.warning("Stale signal rejected: symbol=%s age=%.1fs max=%ss", signal.symbol, signal_age, self.risk_config.signal_max_age_seconds)
             return result
         
 
@@ -43,6 +47,7 @@ class RiskManager():
             result.approved = False
             result.reason = RiskDecisionReason.MARKET_HOURS
             result.details['current_time'] = curr_time.isoformat()
+            logger.debug("Signal rejected outside market hours: symbol=%s current_time=%s", signal.symbol, curr_time.isoformat())
             return result
 
         # 2.1.) Intraday cutoff check (e.g., no new positions after 3:30 PM)
@@ -52,6 +57,7 @@ class RiskManager():
             result.reason = RiskDecisionReason.MARKET_HOURS
             result.details['current_time'] = curr_time.isoformat()
             result.details['message'] = "Intraday cutoff: no new positions after 3:30 PM"
+            logger.debug("Intraday BUY cutoff reached: symbol=%s current_time=%s", signal.symbol, curr_time.isoformat())
             return result
 
 
@@ -62,6 +68,7 @@ class RiskManager():
             result.reason = RiskDecisionReason.DAILY_LOSS_LIMIT_HIT
             result.details['daily_pnl'] = str(positions.get_daily_pnl()) # convert Decimal to string for JSON serialization, while pushing to Kafka
             result.details['max_daily_loss'] = str(self.risk_config.max_daily_loss)
+            logger.warning("Daily loss limit hit, trading halted: daily_pnl=%s limit=%s", positions.get_daily_pnl(), self.risk_config.max_daily_loss)
             return result
 
 
@@ -75,10 +82,13 @@ class RiskManager():
                 result.approved = False
                 result.reason = RiskDecisionReason.DUPLICATE_SIGNAL
                 result.details['last_signal_time'] = positions._recent_signals[signal_fingerprint].isoformat()
+                logger.debug("Duplicate signal within cooldown: symbol=%s fingerprint=%s cooldown=%ss", signal.symbol, signal_fingerprint, self.risk_config.cooldown_seconds)
                 return result
 
 
-        # 5.) Conflicting position 
+        # 5.) Conflicting position
+        # Check if there's a pending order for the same symbol that conflicts with the current signal's side.
+        # For example, if there's a pending BUY order and the new signal is a SELL, or vice versa.
         pending_orders = positions._pending_orders
         for order in pending_orders.values():
             if order.symbol == signal.symbol and (((order.side == OrderSide.BUY) and signal.signal_type in self._SELL_SIGNALS) or (order.side == OrderSide.SELL and signal.signal_type in self._BUY_SIGNALS)):
@@ -89,6 +99,7 @@ class RiskManager():
                     'signal_side': signal.signal_type.value,
                     'order_symbol': order.symbol,
                 }
+                logger.warning("Conflicting pending order: symbol=%s pending_side=%s signal_side=%s", order.symbol, order.side.value, signal.signal_type.value)
                 return result
 
         # 6.) Check if the signal is a sell signal and the current position for that symbol is zero, which would mean there's nothing to sell
@@ -99,6 +110,7 @@ class RiskManager():
                 result.approved = False
                 result.reason = RiskDecisionReason.NO_POSITION_TO_SELL
                 result.details['symbol'] = signal.symbol
+                logger.warning("No position to sell: symbol=%s", signal.symbol)
                 return result
 
 
@@ -112,6 +124,7 @@ class RiskManager():
                     'total_current_holdings': total_current_holdings,
                     'max_positions_allowed': self.risk_config.max_position_size_per_symbol
                 }
+                logger.debug("Max position per symbol: symbol=%s held=%s limit=%s", signal.symbol, total_current_holdings, self.risk_config.max_position_size_per_symbol)
                 return result
 
 
@@ -126,6 +139,7 @@ class RiskManager():
                     'total_current_open_positions': total_current_holdings,
                     'max_positions_allowed': self.risk_config.max_open_positions
                 }
+                logger.debug("Max open positions reached: open=%s limit=%s", total_current_holdings, self.risk_config.max_open_positions)
                 return result
 
 
@@ -137,6 +151,7 @@ class RiskManager():
                 'close_price': str(signal.close_price),
                 'message': "Close price is None, cannot calculate capital required for the trade."
             }
+            logger.warning("Close price is None, cannot size order: symbol=%s signal_id=%s", signal.symbol, signal.signal_id)
             return result
 
         if signal.signal_type in self._BUY_SIGNALS:
@@ -149,8 +164,9 @@ class RiskManager():
                     'close_price': str(close_price),
                     'quantity': quantity,
                     'capital_required': str(close_price * Decimal(quantity)),
-                    'max_capital_per_trade': str(self.risk_config.max_capital_per_trade_exceeded)
+                    'max_capital_per_trade': str(self.risk_config.max_capital_per_trade) 
                 }
+                logger.warning("Stock too expensive for capital limit: symbol=%s price=%s limit=%s", signal.symbol, close_price, self.risk_config.max_capital_per_trade)
                 return result
 
 
@@ -163,11 +179,12 @@ class RiskManager():
                 'recent_order_count': recent_order_count,
                 'max_orders_per_minute': self.risk_config.max_orders_per_minute
             }
+            logger.warning("Rate limit exceeded: orders_last_minute=%s limit=%s", recent_order_count, self.risk_config.max_orders_per_minute)
             return result
 
 
         # Update the recent signals dictionary with the current signal's fingerprint and timestamp
         positions._recent_signals[signal_fingerprint] = datetime.datetime.now(ZoneInfo("America/New_York"))
-
+        logger.info("Signal approved: symbol=%s signal_type=%s signal_id=%s", signal.symbol, signal.signal_type.value, signal.signal_id)
         # If all checks passed, return the result as approved
         return result
