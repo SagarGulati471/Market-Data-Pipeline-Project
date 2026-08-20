@@ -1,4 +1,4 @@
-# Market-Data-Pipeline-and-Strategy-Engine
+# Quant-Data-Pipeline
 
 A real-time market data pipeline that collects live trade data, processes it through multiple stages, generates buy/sell signals based on technical indicators, and executes paper trades with built-in risk management — all running as Docker containers connected through Apache Kafka.
 
