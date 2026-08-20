@@ -27,16 +27,17 @@ class OrderStatus(str, Enum):
     
 
 class Order(BaseModel):
-    order_id:       str         = Field(..., description="Unique identifier for the order")
-    symbol:         str         = Field(..., description="Trading symbol for the order")
-    side:           OrderSide   = Field(..., description="Side of the order (buy/sell)")
-    type:           OrderType   = Field(..., description="Type of the order (market/limit/stop)")
-    quantity:       int         = Field(..., description="Quantity of the asset to be traded")
-    price:          Decimal       = Field(..., description="Price at which the order is placed")
-    filled_price:   Optional[Decimal] = Field(None, description="Price at which the order was filled (if applicable)")
-    status:         OrderStatus = Field(..., description="Current status of the order (pending/filled/cancelled)")
-    filled_at:      Optional[datetime] = Field(None, description="Timestamp when the order was filled (if applicable)")
-    timestamp:      datetime    = Field(..., description="Timestamp when the order was created")
+    order_id:          str               = Field(..., description="Unique identifier for the order")
+    source_signal_id:  Optional[str]               = Field(..., description="signal_id of the Signal that triggered this order")
+    symbol:            str               = Field(..., description="Trading symbol for the order")
+    side:              OrderSide         = Field(..., description="Side of the order (buy/sell)")
+    ordertype:         OrderType         = Field(..., description="Type of the order (market/limit/stop)")
+    quantity:          int               = Field(..., description="Quantity of the asset to be traded")
+    price:             Decimal           = Field(..., description="Price at which the order is placed")
+    filled_price:      Optional[Decimal] = Field(None, description="Price at which the order was filled (if applicable)")
+    status:            OrderStatus       = Field(..., description="Current status of the order (pending/filled/cancelled)")
+    filled_at:         Optional[datetime] = Field(None, description="Timestamp when the order was filled (if applicable)")
+    timestamp:         datetime          = Field(..., description="Timestamp when the order was created")
 
 
 class RiskDecisionReason(str, Enum):
@@ -49,6 +50,7 @@ class RiskDecisionReason(str, Enum):
     STALE_SIGNAL            =  "STALE_SIGNAL"
     MAX_POSITION_REACHED    =  "MAX_POSITION_REACHED"
     NO_POSITION_TO_SELL     =  "NO_POSITION_TO_SELL"
+    SIGNAL_IS_HOLD          = "SIGNAL_IS_HOLD"
     MAX_POSITION_REACHED_PER_SYMBOL =  "MAX_POSITION_REACHED_PER_SYMBOL"
     MAX_CAPITAL_PER_TRADE_EXCEEDED = "MAX_CAPITAL_PER_TRADE_EXCEEDED"
     OTHER                   =  "OTHER"
@@ -95,7 +97,9 @@ class CurrentPositionSize:
         # Position count is the number of unique symbols currently held in the portfolio
         return sum(1 for qty in self._holdings.values() if qty > 0)  # Count only symbols with positive holdings
 
-
+    def get_all_open_positions(self) -> dict[str, int]:
+        return dict(self._holdings)  # snapshot — caller iterating while fills modify _holdings
+         
     def recent_order_count(self, window_seconds: int) -> int:
         # Count how many orders were placed within the last 'window_seconds' seconds
         now = datetime.now()

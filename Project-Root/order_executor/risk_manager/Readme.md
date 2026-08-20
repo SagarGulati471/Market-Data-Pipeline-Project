@@ -39,7 +39,9 @@ The signal implies buying at $150 × 10 shares = $1500. Do you have $1500 availa
 9. Order rate limit
 Placed 20 orders in the last 60 seconds? Slow down. Broker APIs have rate limits and will reject or ban you if you exceed them. Track order count in a rolling time window.
 
-
+# Model Structure
+signal.signal_id  ──→  order.source_signal_id
+(symbol, resolution, open_time)  ──→  joins candle/indicator/signal tables
 
 -----------------------------------------------------------------------------------------------
 
