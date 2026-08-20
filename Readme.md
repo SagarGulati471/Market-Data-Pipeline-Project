@@ -8,8 +8,7 @@ The goal of this project was to build something production-grade from scratch: e
 
 ## Architecture
 
-<img width="917" height="871" alt="image" src="https://github.com/user-attachments/assets/a07b4293-f9b3-459b-86c1-1a908aec788b" />. 
-
+<img width="917" height="871" alt="image" src="https://github.com/user-attachments/assets/a07b4293-f9b3-459b-86c1-1a908aec788b" />  
 
 **Full diagram:** https://app.diagrams.net/#G1XzVCH1INkYbS2aGT_wJ4cgXVnr5ShD6k
 
